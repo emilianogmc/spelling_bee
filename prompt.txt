@@ -1,0 +1,106 @@
+Build a standalone React web app called "Spelling Bee Drill" — a study tool for
+spelling bee finals prep. Use Vite + React + Tailwind CSS + lucide-react icons.
+No backend — everything runs client-side in the browser.
+
+CORE FEATURES
+
+1. Word list, preloaded with these 162 words (editable later in a settings panel):
+degenerate, utilitarian, altruism, planetarium, mantelpiece, wheelwright,
+recognition, comportment, significant, magnificent, contentedly, destination,
+reactionary, germane, indifferent, historical, depredation, figurative,
+nefarious, immaculate, necessities, transferred, execrate, encumbrance,
+filial, premonition, fallibility, picturesque, asphyxiate, proportions,
+fabricated, kamikaze, melange, considered, stereotype, mathematics, alopecia,
+scientific, extenuating, domicile, contraband, foreshadow, maladjusted,
+consequence, abjure, tympanum, opprobrious, collections, quarantine,
+pernicious, enterprise, insouciance, production, consanguineous,
+consumptive, irrelevant, anatomical, recommendation, tradition, compromise,
+arithmetic, derivative, cadence, impervious, polysaccharide,
+indiscriminate, regrettable, tribunal, journalism, charioteer, nonexistent,
+ineluctable, anachronistic, deductible, fashionable, milieu,
+ostentatiously, peacefully, patronymic, competition, impalpable,
+respiration, orthopaedic, philosopher, tempestuous, requiem, interpreter,
+explanation, shrubbery, sedulous, indignantly, demagogue, preparatory,
+personality, discipline, compliance, likelihood, amputate, advancement,
+quotient, liquidation, unconcerned, illustrious, chromium, fealty,
+colloquial, misdemeanor, unrequited, industrious, gravitation, torpor,
+consignment, abeyance, verbatim, antithesis, antibiotics, frantically,
+plasticity, martinet, sapiential, perspicuous, zinciferous, lilliputian,
+treacherous, nuisance, imperial, continental, dilatory, hesitation,
+commutation, labyrinth, implicitly, profligate, putrefy, circumlocution,
+assimilate, amputation, shimmering, concordance, unintelligible,
+ingredient, respectful, confederacy, noticeboard, transcendental,
+correction, discriminating, photograph, monumental, fractional,
+deliveries, frightened, hodgepodge, instructor, repugnance, faithfully,
+definition, salmonella, introduced, interested, interpretation,
+philanthropist
+
+2. Quiz flow: shows one word at a time in random order.
+   - A speak button uses the Web Speech API (SpeechSynthesisUtterance) to
+     read the word aloud. Include a rate slider (0.5x–1x) for slow playback,
+     and a repeat button.
+   - User types the spelling into a text input and submits (Enter or button).
+   - On submit, compare case-insensitively. Show clear correct/incorrect
+     feedback; on incorrect, reveal the correct spelling letter-by-letter
+     (e.g. "S-A-P-I-E-N-T-I-A-L").
+   - Auto-advance to the next word after a short delay (faster on correct,
+     slower on incorrect so they can read the correction).
+
+3. Mastery tracking per word:
+   - Track a correct-streak counter per word.
+   - 3 correct in a row (no wrong answers in between) = "mastered".
+   - Any wrong answer resets that word's streak to 0 and flags it "hard"
+     until it's re-mastered.
+   - Words with no attempts yet are "new".
+   - States: new / learning (attempted, streak 1-2, no recent miss) / hard
+     (last attempt was wrong) / mastered (streak >= 3).
+
+4. Filters: All / Hard / Untested / Mastered — as toggle chips above the
+   quiz. Selecting one restricts the random draw pool to that subset.
+
+5. Persistence: use localStorage (not sessionStorage, not any server) to
+   save per-word progress and the current word list, so progress survives
+   closing and reopening the browser. Load on mount, save on every update.
+
+6. Progress visualization: a honeycomb-style grid (small hexagons via CSS
+   clip-path, tessellated in offset rows) with one cell per word, colored by
+   state (neutral/gray for new, amber for learning, red for hard, green for
+   mastered). This is the visual centerpiece of the page.
+
+7. Stats row: total words, mastered count, hard count.
+
+8. Settings/edit panel (collapsible): textarea to view/edit the word list
+   (one word per line), a "save list" button, and a "reset all progress"
+   button.
+
+DESIGN DIRECTION
+- Dark, warm theme — think honeycomb/beehive, not generic dark mode. Base
+  background near #17130D, card surfaces slightly lighter, warm honey-gold
+  (#E8A93B) as the primary accent, muted amber for secondary actions,
+  cream (#F5EEDD) for body text. Success states in a muted olive-green,
+  errors in a muted brick-red/orange — avoid neon or saturated colors.
+- Pair a serif display font (e.g. "Fraunces" from Google Fonts) for
+  headings with a clean sans (Inter) for body/UI, and a monospace font
+  (JetBrains Mono) for the word input, letter-by-letter corrections, and
+  stat numbers — spelling should feel typographically deliberate.
+- Use lucide-react icons (Volume2 for speak, RotateCcw for repeat,
+  SkipForward for skip, Settings for the edit panel, Check/X for feedback,
+  Trash2 for reset) instead of emoji.
+- Flat design, no gradients or drop shadows beyond subtle borders. Rounded
+  corners (8-14px), generous padding, calm and uncluttered.
+- Fully responsive down to mobile width (this will likely be used on a
+  phone the morning of the competition).
+
+TECH NOTES
+- Vite + React (functional components, hooks only, no class components).
+- Tailwind CSS for all styling — set up tailwind.config.js with the custom
+  color palette described above as named theme colors.
+- lucide-react for icons.
+- No external state management library needed — useState/useEffect is fine
+  for an app this size.
+- Handle the case where SpeechSynthesis voices load asynchronously
+  (voiceschanged event) and gracefully fall back if no en-US voice is found.
+- Include a README with `npm install` / `npm run dev` instructions.
+
+Set up the project structure, install dependencies, and get it running on
+npm run dev when done.
