@@ -6,9 +6,14 @@ import { useDrill } from "./hooks/useDrill.js";
 import { useSpeechSynth } from "./hooks/useSpeechSynth.js";
 import { useSpeechRecognition } from "./hooks/useSpeechRecognition.js";
 import { KEY_AUTOMIC, loadStored, saveStored } from "./lib/progress.js";
+import { isIOS } from "./lib/platform.js";
 
 /** A beat of silence after the voice stops, so the mic doesn't catch the tail. */
 const MIC_ARM_DELAY = 300;
+
+// iOS Safari rejects a mic start that isn't inside a direct tap, so auto-mic
+// can only run on platforms without that restriction.
+const AUTO_MIC_CAPABLE = !isIOS();
 
 export default function App() {
   const {
@@ -29,7 +34,9 @@ export default function App() {
   const [answer, setAnswer] = useState("");
   const [rate, setRate] = useState(0.75);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [autoMic, setAutoMic] = useState(() => loadStored(KEY_AUTOMIC, true) !== false);
+  const [autoMic, setAutoMic] = useState(
+    () => AUTO_MIC_CAPABLE && loadStored(KEY_AUTOMIC, true) !== false
+  );
 
   const { speak, cancel, speaking } = useSpeechSynth();
 
@@ -82,7 +89,7 @@ export default function App() {
 
   const armMic = useCallback(() => {
     clearArmTimer();
-    if (!autoMic || !micSupported || micError) return;
+    if (!AUTO_MIC_CAPABLE || !autoMic || !micSupported || micError) return;
     armTimerRef.current = setTimeout(() => {
       armTimerRef.current = null;
       start();
@@ -136,6 +143,7 @@ export default function App() {
   }, [cancel, clearArmTimer, listening, start, stop]);
 
   const toggleAutoMic = useCallback(() => {
+    if (!AUTO_MIC_CAPABLE) return;
     clearArmTimer();
     const next = !autoMic;
     setAutoMic(next);
@@ -189,6 +197,7 @@ export default function App() {
               listening={listening}
               micSupported={micSupported}
               autoMic={autoMic}
+              autoMicCapable={AUTO_MIC_CAPABLE}
               onToggleAutoMic={toggleAutoMic}
               heard={heard}
               interim={interim}

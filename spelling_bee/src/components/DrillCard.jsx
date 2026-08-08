@@ -30,6 +30,7 @@ export default function DrillCard({
   listening,
   micSupported,
   autoMic,
+  autoMicCapable,
   onToggleAutoMic,
   heard,
   interim,
@@ -103,18 +104,25 @@ export default function DrillCard({
           )}
 
           <label
+            title={
+              micSupported && !autoMicCapable
+                ? "iPhone and iPad require tapping the mic each time — Safari blocks starting it any other way."
+                : undefined
+            }
             className={`mt-2 inline-flex items-center gap-2 text-[11px] text-muted ${
-              micSupported ? "cursor-pointer hover:text-cream" : "opacity-40"
+              micSupported && autoMicCapable ? "cursor-pointer hover:text-cream" : "opacity-40"
             }`}
           >
             <input
               type="checkbox"
               checked={autoMic}
-              disabled={!micSupported}
+              disabled={!micSupported || !autoMicCapable}
               onChange={onToggleAutoMic}
               className="h-3.5 w-3.5 accent-honey"
             />
-            Open the mic as soon as the word is read
+            {micSupported && !autoMicCapable
+              ? "Open the mic as soon as the word is read (not on iPhone/iPad — tap the mic instead)"
+              : "Open the mic as soon as the word is read"}
           </label>
 
           <Feedback feedback={feedback} />

@@ -24,6 +24,11 @@ repeat, after "spell it to me", and again if a letter came through garbled — s
 a whole pass runs hands-free. Uncheck "open the mic as soon as the word is read"
 to go back to pressing it yourself; the choice is remembered.
 
+Not on iPhone or iPad, though: Safari there only allows starting the mic from
+inside a direct tap, so the checkbox is disabled and every word needs a tap on
+the mic button. That's a WebKit restriction, not a bug — the mic still works
+fine, it just can't open itself.
+
 Spell out loud the way you would in competition — say the word, spell it, say it
 again. The parser strips the word itself from the transcript.
 
