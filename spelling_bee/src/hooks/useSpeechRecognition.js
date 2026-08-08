@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { splitOnRestart, transcriptToLetters } from "../lib/letters.js";
-import { isIOS } from "../lib/platform.js";
-
-// Safari's SpeechRecognition can only be started once — a second .start() on
-// an already-used instance fails (often surfacing as "not-allowed"), so a
-// fresh instance is required for every session, including the mid-word
-// restarts continuous mode needs after a silence gap.
-const SKIP_STREAM_PRIMING = isIOS();
 
 /**
  * Continuous letter-by-letter recognition.
  *
- * Three details matter here. Results arrive in chunks, so finalised chunks are
+ * Four details matter here. Results arrive in chunks, so finalised chunks are
  * appended to a buffer rather than replacing it — otherwise "P-R-E-P-A" gets
- * wiped by the next chunk. The recogniser auto-stops on silence, so onend
- * restarts it while the user still has the mic open. And every transcript is
- * checked for "may I start over?" before it is read as letters.
+ * wiped by the next chunk. Interim chunks are folded into that buffer before
+ * an instance ends, since a recogniser discards them and a silence gap would
+ * otherwise swallow every letter spoken since the last final result. Safari
+ * only allows an instance to be started once, so each session gets a fresh
+ * one. And every transcript is checked for "may I start over?" before it is
+ * read as letters.
  */
 export function useSpeechRecognition({ target, onResult, onRestart }) {
   const [supported, setSupported] = useState(false);
@@ -27,12 +23,12 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
   const recogRef = useRef(null);
   const bufferRef = useRef("");
+  const pendingRef = useRef("");
   const wantsMicRef = useRef(false);
   const targetRef = useRef(target);
   const onResultRef = useRef(onResult);
   const onRestartRef = useRef(onRestart);
   const restartUsedRef = useRef(false);
-  const streamRef = useRef(null);
 
   // A new word earns a fresh start-over.
   useEffect(() => {
@@ -49,16 +45,30 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     onRestartRef.current = onRestart;
   }, [onRestart]);
 
-  const finish = useCallback((deliver) => {
-    wantsMicRef.current = false;
-    try {
-      recogRef.current?.stop();
-    } catch {
-      /* already stopped */
-    }
-    setListening(false);
-    if (deliver) onResultRef.current?.(bufferRef.current);
+  // Interim letters are real letters — they just haven't been finalised yet.
+  // Anything still pending has to land in the buffer before it is read.
+  const flushPending = useCallback(() => {
+    if (!pendingRef.current) return;
+    bufferRef.current += pendingRef.current;
+    pendingRef.current = "";
+    setHeard(bufferRef.current);
+    setInterim(false);
   }, []);
+
+  const finish = useCallback(
+    (deliver) => {
+      wantsMicRef.current = false;
+      flushPending();
+      try {
+        recogRef.current?.stop();
+      } catch {
+        /* already stopped */
+      }
+      setListening(false);
+      if (deliver) onResultRef.current?.(bufferRef.current);
+    },
+    [flushPending]
+  );
 
   // Builds and wires a brand-new recognizer. Called for every start() and
   // again from onend whenever continuous mode needs to bridge a silence gap.
@@ -117,10 +127,14 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
         else pending += best;
       }
 
+      pendingRef.current = pending;
       setHeard(bufferRef.current + pending);
       setInterim(Boolean(pending));
 
-      if (goal && bufferRef.current === goal) finish(true);
+      // Check against the interim text too. Waiting for the recogniser to
+      // finalise the last letter adds a second or more of dead air on a word
+      // the speller has already finished.
+      if (goal && bufferRef.current + pending === goal) finish(true);
     };
 
     recog.onerror = (event) => {
@@ -134,7 +148,20 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     };
 
     recog.onend = () => {
+      // A recogniser throws away its interim results when it ends, so a
+      // silence gap mid-word would otherwise wipe every letter spoken since
+      // the last final chunk — the speller sees their spelling reset.
+      flushPending();
+
       if (wantsMicRef.current) {
+        const goal = (targetRef.current || "").toLowerCase();
+        if (goal && bufferRef.current === goal) {
+          wantsMicRef.current = false;
+          setListening(false);
+          onResultRef.current?.(bufferRef.current);
+          return;
+        }
+
         const next = spawn();
         if (next) {
           try {
@@ -150,7 +177,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
     recogRef.current = recog;
     return recog;
-  }, [finish]);
+  }, [finish, flushPending]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -165,29 +192,22 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       } catch {
         /* nothing to stop */
       }
-      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
-  const start = useCallback(async () => {
+  // No getUserMedia priming here on purpose. Holding a stream open kept the
+  // permission grant warm, but it also kept the mic live for the whole
+  // session, and macOS routes playback through voice-processing whenever a
+  // mic stream is open — which silences the spoken word. The recogniser
+  // prompts for permission on its own, and a secure origin remembers it.
+  const start = useCallback(() => {
     if (!supported) return;
     bufferRef.current = "";
+    pendingRef.current = "";
     setHeard("");
     setInterim(false);
     setError(null);
     wantsMicRef.current = true;
-
-    // Holding one stream open keeps the permission grant alive for the
-    // session. Safari's own mic acquisition already persists across
-    // sessions, and a second, separately-held stream risks contending with
-    // it for the input on iOS, so this is skipped there.
-    if (!SKIP_STREAM_PRIMING && !streamRef.current && navigator.mediaDevices?.getUserMedia) {
-      try {
-        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        /* recognition will surface its own permission error */
-      }
-    }
 
     const recog = spawn();
     if (!recog) return;
@@ -201,10 +221,11 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
   const stop = useCallback(() => finish(true), [finish]);
 
   const reset = useCallback(() => {
+    if (wantsMicRef.current) finish(false);
     bufferRef.current = "";
+    pendingRef.current = "";
     setHeard("");
     setInterim(false);
-    if (wantsMicRef.current) finish(false);
   }, [finish]);
 
   return { supported, listening, heard, interim, error, restartUsed, start, stop, reset };
