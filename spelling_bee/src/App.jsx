@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import DrillCard from "./components/DrillCard.jsx";
-import ProgressComb from "./components/ProgressComb.jsx";
+import PracticeTab from "./components/PracticeTab.jsx";
+import ProgressTab from "./components/ProgressTab.jsx";
 import SttDebug from "./components/SttDebug.jsx";
+import TabBar, { TABS } from "./components/TabBar.jsx";
 import TtsDebug from "./components/TtsDebug.jsx";
-import WordListEditor from "./components/WordListEditor.jsx";
+import VerdictSheet from "./components/VerdictSheet.jsx";
+import WordsTab from "./components/WordsTab.jsx";
 import { useDrill } from "./hooks/useDrill.js";
 import { useSpeechSynth } from "./hooks/useSpeechSynth.js";
 import { useSpeechRecognition } from "./hooks/useSpeechRecognition.js";
@@ -44,7 +46,7 @@ export default function App() {
 
   const [answer, setAnswer] = useState("");
   const [rate, setRate] = useState(0.75);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [tab, setTab] = useState("practice");
   const [autoMic, setAutoMic] = useState(
     () => AUTO_MIC_CAPABLE && loadStored(KEY_AUTOMIC, true) !== false
   );
@@ -203,70 +205,94 @@ export default function App() {
     say(current, { rate: 0.8, spellOut: true });
   }, [current, say]);
 
+  // Choosing a set to drill is a practice decision, so it hands the speller
+  // back to the drill rather than leaving them to find the tab themselves.
+  const pickPool = useCallback(
+    (next) => {
+      setFilter(next);
+      setTab("practice");
+    },
+    [setFilter]
+  );
+
+  const micHint = IOS_DEVICE
+    ? "Voice input on iPhone and iPad needs Safari."
+    : "Voice input needs Chrome, Edge, or Safari.";
+
+  const streak = current ? progress[current]?.streak ?? 0 : 0;
+  const verdictOpen = tab === "practice" && Boolean(feedback);
+
   return (
-    <div className="flex min-h-screen justify-center px-4 pt-8 pb-16">
-      <div className="w-full max-w-[1020px]">
-        <p className="mb-1.5 font-mono text-xs uppercase tracking-[0.14em] text-honey">
-          Finals — Monday
-        </p>
-        <h1 className="mb-1 font-display text-4xl font-semibold tracking-tight">
-          Spelling drill
+    <div className="min-h-screen pb-[92px]">
+      <header className="mx-auto w-full max-w-[560px] px-4 pt-7 pb-5">
+        <h1 className="font-display text-2xl font-semibold">
+          {TABS.find((t) => t.id === tab)?.label}
         </h1>
-        <p className="mb-6 text-sm text-muted">
-          Hear it, spell it, get the miss corrected out loud.
-        </p>
+      </header>
 
-        <div className="grid items-stretch gap-5 lg:grid-cols-[1.75fr_1fr]">
-          <div className="flex min-w-0 flex-col gap-5">
-            <DrillCard
-              filter={filter}
-              counts={counts}
-              onFilterChange={setFilter}
-              remaining={remaining}
-              current={current}
-              answer={answer}
-              onAnswerChange={setAnswer}
-              onSubmit={handleSubmit}
-              onSkip={advance}
-              onSpeak={() => say(current)}
-              onSpellOut={{ aloud: spellAloud, toggleMic }}
-              speaking={speaking}
-              rate={rate}
-              onRateChange={setRate}
-              listening={listening}
-              micSupported={micSupported}
-              autoMic={autoMic}
-              autoMicCapable={AUTO_MIC_CAPABLE}
-              iosDevice={IOS_DEVICE}
-              onToggleAutoMic={toggleAutoMic}
-              heard={heard}
-              interim={interim}
-              micError={micError}
-              ttsError={ttsError}
-              restartUsed={restartUsed}
-              feedback={feedback}
-              onToggleEditor={() => setEditorOpen((open) => !open)}
-            />
+      <main className="mx-auto w-full max-w-[560px] px-4">
+        {tab === "practice" && (
+          <PracticeTab
+            filter={filter}
+            remaining={remaining}
+            current={current}
+            streak={streak}
+            answer={answer}
+            onAnswerChange={setAnswer}
+            onSubmit={handleSubmit}
+            onSkip={advance}
+            onSpeak={() => say(current)}
+            onSpellOut={spellAloud}
+            onToggleMic={toggleMic}
+            speaking={speaking}
+            listening={listening}
+            micSupported={micSupported}
+            micHint={micHint}
+            heard={heard}
+            interim={interim}
+            micError={micError}
+            restartUsed={restartUsed}
+            ttsError={ttsError}
+            verdictOpen={verdictOpen}
+          />
+        )}
 
-            {editorOpen && (
-              <WordListEditor words={words} onSave={setWords} onReset={resetProgress} />
-            )}
+        {tab === "progress" && (
+          <ProgressTab
+            words={words}
+            progress={progress}
+            current={current}
+            counts={counts}
+            filter={filter}
+            onPick={pickPool}
+          />
+        )}
 
-            {TTS_DEBUG && (
-              <TtsDebug snapshot={ttsSnapshot} log={ttsLog} error={ttsError} />
-            )}
+        {tab === "words" && (
+          <WordsTab
+            words={words}
+            onSave={setWords}
+            onReset={resetProgress}
+            rate={rate}
+            onRateChange={setRate}
+            autoMic={autoMic}
+            autoMicCapable={AUTO_MIC_CAPABLE}
+            micSupported={micSupported}
+            onToggleAutoMic={toggleAutoMic}
+          />
+        )}
 
+        {(TTS_DEBUG || STT_DEBUG) && (
+          <div className="mt-8 flex flex-col gap-5">
+            {TTS_DEBUG && <TtsDebug snapshot={ttsSnapshot} log={ttsLog} error={ttsError} />}
             {STT_DEBUG && <SttDebug log={micLog} target={current} heard={heard} />}
           </div>
+        )}
+      </main>
 
-          <div className="flex min-w-0 flex-col gap-5">
-            <div className="flex-1 rounded-xl border border-line bg-surface px-6 py-5">
-              <h2 className="mb-3.5 font-display text-base font-semibold">Progress comb</h2>
-              <ProgressComb words={words} progress={progress} current={current} />
-            </div>
-          </div>
-        </div>
-      </div>
+      {verdictOpen && <VerdictSheet feedback={feedback} onContinue={advance} />}
+
+      <TabBar active={tab} onChange={setTab} />
     </div>
   );
 }
