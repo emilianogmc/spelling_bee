@@ -33,6 +33,20 @@ export default function Feedback({ feedback }) {
     );
   }
 
+  if (feedback.kind === "truncated") {
+    return (
+      <div className={`${base} border-honeydim bg-[#3a2f1c] text-honey`}>
+        <CircleAlert size={17} className="mt-0.5 shrink-0" />
+        <p>
+          Only caught{" "}
+          <b className="font-mono font-medium tracking-widest">{spaced(feedback.heard)}</b> — the
+          last letters were cut off. Not scored. Spell it again, and hold the final letter a beat
+          longer.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className={`${base} border-honeydim bg-[#3a2f1c] text-honey`}>
       <CircleAlert size={17} className="mt-0.5 shrink-0" />

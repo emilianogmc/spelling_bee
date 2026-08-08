@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_WORDS } from "../data/words.js";
-import { isNearMiss } from "../lib/letters.js";
+import { isNearMiss, isTruncated } from "../lib/letters.js";
 import {
   KEY_PROGRESS,
   KEY_WORDS,
@@ -69,6 +69,14 @@ export function useDrill() {
       // A mic-only confusion (P heard as B) shouldn't count as a miss.
       if (fromVoice && answer !== target && isNearMiss(answer, target)) {
         setFeedback({ kind: "unclear", heard: answer });
+        return "unclear";
+      }
+
+      // Letters correct as far as they go, then stopping short, means the
+      // recogniser lost the tail — nobody spells a word right and then just
+      // stops. Marking that wrong spends a streak on a microphone problem.
+      if (fromVoice && answer !== target && isTruncated(answer, target)) {
+        setFeedback({ kind: "truncated", heard: answer });
         return "unclear";
       }
 

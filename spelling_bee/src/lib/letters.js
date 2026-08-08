@@ -89,6 +89,19 @@ export function isNearMiss(heard, target) {
 }
 
 /**
+ * True when the transcript is the target's own opening letters and simply
+ * stops early — the signature of a recogniser losing the tail of the audio
+ * rather than of a speller getting it wrong. Requires most of the word to be
+ * there, so a genuinely abandoned attempt still counts as a miss.
+ */
+export function isTruncated(heard, target) {
+  if (!heard || heard.length >= target.length) return false;
+  if (!target.startsWith(heard)) return false;
+  const missing = target.length - heard.length;
+  return missing <= 3 && heard.length >= Math.ceil(target.length / 2);
+}
+
+/**
  * A speller who gets tangled can ask for a clean slate the way they would at a
  * real bee: "May I start over?". The lead-in ("may I", "can I") is left out on
  * purpose — the recognizer mangles short filler words far more often than the

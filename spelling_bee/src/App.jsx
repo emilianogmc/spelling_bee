@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DrillCard from "./components/DrillCard.jsx";
 import ProgressComb from "./components/ProgressComb.jsx";
+import SttDebug from "./components/SttDebug.jsx";
 import TtsDebug from "./components/TtsDebug.jsx";
 import WordListEditor from "./components/WordListEditor.jsx";
 import { useDrill } from "./hooks/useDrill.js";
@@ -18,9 +19,12 @@ const IOS_DEVICE = isIOS();
 // can only run on platforms without that restriction.
 const AUTO_MIC_CAPABLE = !IOS_DEVICE;
 
-const TTS_DEBUG =
-  typeof window !== "undefined" &&
-  new URLSearchParams(window.location.search).get("debug") === "tts";
+const DEBUG =
+  typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("debug")
+    : null;
+const TTS_DEBUG = DEBUG === "tts";
+const STT_DEBUG = DEBUG === "stt";
 
 export default function App() {
   const {
@@ -106,6 +110,7 @@ export default function App() {
     start,
     stop,
     reset: resetMic,
+    log: micLog,
   } = useSpeechRecognition({
     target: current ?? "",
     onResult: handleVoiceResult,
@@ -250,6 +255,8 @@ export default function App() {
             {TTS_DEBUG && (
               <TtsDebug snapshot={ttsSnapshot} log={ttsLog} error={ttsError} />
             )}
+
+            {STT_DEBUG && <SttDebug log={micLog} target={current} heard={heard} />}
           </div>
 
           <div className="flex min-w-0 flex-col gap-5">

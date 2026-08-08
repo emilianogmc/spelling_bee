@@ -39,6 +39,10 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
   const [interim, setInterim] = useState(false);
   const [error, setError] = useState(null);
   const [restartUsed, setRestartUsed] = useState(false);
+  // Raw, pre-parser record of what the engine actually returned. Every fix
+  // attempted for the dropped-final-letter bug reasoned about post-processed
+  // output; this is the only way to tell "never transcribed" from "parsed away".
+  const [log, setLog] = useState([]);
 
   const recogRef = useRef(null);
   const bufferRef = useRef("");
@@ -68,6 +72,11 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
   useEffect(() => {
     onRestartRef.current = onRestart;
   }, [onRestart]);
+
+  const note = useCallback((entry) => {
+    const stamp = new Date().toISOString().slice(14, 22);
+    setLog((prev) => [...prev.slice(-59), `${stamp} ${entry}`]);
+  }, []);
 
   // Interim letters are real letters — they just haven't been finalised yet.
   // Anything still pending has to land in the buffer before it is read.
@@ -183,11 +192,24 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     recog.onstart = () => {
       setListening(true);
       setError(null);
+      note("start");
     };
+    recog.onspeechstart = () => note("speechstart");
+    recog.onspeechend = () => note("speechend");
+    recog.onaudioend = () => note("audioend");
 
     recog.onresult = (event) => {
       const goal = (targetRef.current || "").toLowerCase();
       let pending = "";
+
+      // Logged before a single character is parsed, quoted so trailing spaces
+      // and punctuation are visible.
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const raw = event.results[i];
+        const alts = [];
+        for (let j = 0; j < raw.length; j++) alts.push(JSON.stringify(raw[j].transcript));
+        note(`result[${i}] final=${raw.isFinal} alts=${alts.join(" | ")}`);
+      }
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -228,6 +250,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       pendingRef.current = pending;
       setHeard(bufferRef.current + pending);
       setInterim(Boolean(pending));
+      note(`parsed -> buffer="${bufferRef.current}" pending="${pending}"`);
 
       // Check against the interim text too. Waiting for the recogniser to
       // finalise the last letter adds a second or more of dead air on a word
@@ -244,6 +267,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     };
 
     recog.onerror = (event) => {
+      note(`error ${event.error}`);
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         wantsMicRef.current = false;
         setListening(false);
@@ -254,6 +278,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     };
 
     recog.onend = () => {
+      note(`end (pending="${pendingRef.current}" buffer="${bufferRef.current}")`);
       // A recogniser throws away its interim results when it ends, so a
       // silence gap mid-word would otherwise wipe every letter spoken since
       // the last final chunk — the speller sees their spelling reset.
@@ -300,7 +325,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
     recogRef.current = recog;
     return recog;
-  }, [armIdle, deliverBuffer, finish, flushPending]);
+  }, [armIdle, deliverBuffer, finish, flushPending, note]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -359,5 +384,16 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     setInterim(false);
   }, [clearIdleTimer, finish]);
 
-  return { supported, listening, heard, interim, error, restartUsed, start, stop, reset };
+  return {
+    supported,
+    listening,
+    heard,
+    interim,
+    error,
+    restartUsed,
+    start,
+    stop,
+    reset,
+    log,
+  };
 }
