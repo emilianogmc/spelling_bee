@@ -4,8 +4,8 @@
 audio. The mic button works, so speech *recognition* functions. On iPhone Safari the
 same deployed app speaks correctly.
 
-**Status.** Root cause identified with high confidence after the Step 1 triage below.
-Fix shipped. This document is kept as the record of what was ruled out and how.
+**Status.** Resolved and confirmed. This document is kept as the record of what was
+ruled out and how, since the same class of bug can recur.
 
 ---
 
@@ -143,13 +143,33 @@ binding was the stuck part rather than the engine as a whole. Neither is expecte
 fix a genuinely wedged audio service, but both close off two remaining code-level
 explanations before concluding it's outside the page's reach entirely.
 
-**Next diagnostic step — not yet run:** fully quit Chrome (Cmd+Q, not just closing
-the tab or window), relaunch, go straight to the site, and click the speaker once
-*before touching the mic at all*. If a clean process speaks correctly on the first
-try, the mic-contention theory is confirmed and the practical mitigation is
-reducing how aggressively this app opens the microphone on Chrome/macOS (auto-mic
-already defaults conservatively, but every recognition session — manual or
-automatic — is a fresh opportunity to trigger the underlying service bug).
+**Confirmed.** Quitting every app with Cmd+Q (not just reloading the page, not just
+closing the tab) and relaunching Chrome fixed it. This is conclusive: nothing a page
+can do reaches Chrome's shared audio service, so the *only* thing that changed
+between "silent" and "working" was killing and restarting the process. Every
+code-level theory in this document — the app's own JS, its build, its deploy, its
+mic usage pattern — is thereby ruled out as the root cause. It was never fixable
+from inside the page, which is exactly why three rounds of app-level fixes (Round 1
+through the watchdog in Round 4) could confirm-and-narrow the diagnosis but never
+resolve the symptom themselves.
+
+## Outcome
+
+- **Root cause:** Chrome's out-of-process, browser-wide audio service can wedge on
+  macOS in a way no page-level API can detect or recover from. Confirmed by a full
+  process restart being the only thing that fixed it.
+- **What the app-level fixes were for.** They weren't wasted — Rounds 1–3 fixed three
+  real, separate, reproducible bugs that were genuinely silencing speech on their own
+  merits (the ungestured page-load call wedging Chrome's *queue*, rapid re-clicks
+  cancelling each other, the voice-loading effect's cleanup killing playback). The
+  watchdog in Round 4 is what proved those fixes had run out of runway — three retries
+  failing identically is what pointed at the audio *service* rather than anything the
+  page controls, and that reframing is what led to the Cmd+Q test that closed this out.
+- **What's left as residual risk, not a bug to fix:** the underlying Chrome bug can
+  still wedge again on this machine in a future session, unrelated to this app's code.
+  If speech goes silent again, `?debug=tts` will show the same signature (`busy=false`
+  → watchdog fires → retries fail identically) — and the fix is the same: fully quit
+  and relaunch Chrome, not another code change.
 
 ---
 
