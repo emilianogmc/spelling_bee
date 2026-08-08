@@ -7,6 +7,7 @@ export default function AnswerRow({
   onToggleMic,
   listening,
   micSupported,
+  micHint,
   disabled,
 }) {
   return (
@@ -35,7 +36,7 @@ export default function AnswerRow({
         onClick={onToggleMic}
         disabled={disabled || !micSupported}
         aria-label={listening ? "Stop and check" : "Spell out loud"}
-        title={micSupported ? undefined : "Speech recognition needs Chrome, Edge, or Safari"}
+        title={micSupported ? undefined : micHint}
         className={`inline-flex min-w-12 items-center justify-center rounded-lg border px-3.5 transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
           listening
             ? "animate-pulse border-miss bg-missdim text-miss"

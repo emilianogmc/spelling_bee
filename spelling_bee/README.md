@@ -57,3 +57,9 @@ refreshes — per browser profile, on that machine only.
 Speech recognition needs Chrome, Edge, or Safari and an internet connection —
 Chrome sends audio to Google's servers to transcribe. Firefox has no support;
 the mic button disables itself and typing still works offline.
+
+On iPhone or iPad, that list narrows to Safari only. Chrome, Firefox, and Edge
+on iOS all run on Apple's WebKit engine, but Apple grants the speech APIs to
+Safari alone — third-party iOS browsers have no way to reach them, so the mic
+disables itself there too. This is an Apple restriction, not something a
+website can work around.

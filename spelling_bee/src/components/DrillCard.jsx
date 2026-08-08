@@ -5,6 +5,11 @@ import AnswerRow from "./AnswerRow.jsx";
 import Feedback from "./Feedback.jsx";
 import StatRow from "./StatRow.jsx";
 
+const MIC_UNSUPPORTED_HINT = {
+  ios: "voice input on iphone/ipad needs safari — other browsers can't reach it",
+  default: "voice input needs chrome, edge, or safari",
+};
+
 const EMPTY_COPY = {
   mastered: "Nothing mastered yet. Three correct in a row moves a word here.",
   hard: "No hard words right now. Run the full list to find them.",
@@ -31,6 +36,7 @@ export default function DrillCard({
   micSupported,
   autoMic,
   autoMicCapable,
+  iosDevice,
   onToggleAutoMic,
   heard,
   interim,
@@ -39,6 +45,8 @@ export default function DrillCard({
   feedback,
   onToggleEditor,
 }) {
+  const micHint = iosDevice ? MIC_UNSUPPORTED_HINT.ios : MIC_UNSUPPORTED_HINT.default;
+
   return (
     <div className="rounded-xl border border-line bg-surface px-6 py-5">
       <FilterChips active={filter} counts={counts} onChange={onFilterChange} />
@@ -73,6 +81,7 @@ export default function DrillCard({
             onToggleMic={onSpellOut.toggleMic}
             listening={listening}
             micSupported={micSupported}
+            micHint={micHint}
             disabled={!current}
           />
 
@@ -89,7 +98,7 @@ export default function DrillCard({
             ) : listening ? (
               "listening… spell it out"
             ) : !micSupported ? (
-              "voice input needs chrome, edge, or safari"
+              micHint
             ) : (
               ""
             )}

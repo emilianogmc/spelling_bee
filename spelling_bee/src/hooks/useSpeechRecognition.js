@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { splitOnRestart, transcriptToLetters } from "../lib/letters.js";
+import { isIOS } from "../lib/platform.js";
+
+// Safari's SpeechRecognition can only be started once — a second .start() on
+// an already-used instance fails (often surfacing as "not-allowed"), so a
+// fresh instance is required for every session, including the mid-word
+// restarts continuous mode needs after a silence gap.
+const SKIP_STREAM_PRIMING = isIOS();
 
 /**
  * Continuous letter-by-letter recognition.
@@ -53,13 +60,11 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     if (deliver) onResultRef.current?.(bufferRef.current);
   }, []);
 
-  useEffect(() => {
+  // Builds and wires a brand-new recognizer. Called for every start() and
+  // again from onend whenever continuous mode needs to bridge a silence gap.
+  const spawn = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setSupported(false);
-      return undefined;
-    }
-    setSupported(true);
+    if (!SR) return null;
 
     const recog = new SR();
     recog.lang = "en-US";
@@ -130,39 +135,53 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
     recog.onend = () => {
       if (wantsMicRef.current) {
-        try {
-          recog.start();
-        } catch {
-          /* restart raced with stop */
+        const next = spawn();
+        if (next) {
+          try {
+            next.start();
+            return;
+          } catch {
+            /* fall through to stopped state */
+          }
         }
-        return;
       }
       setListening(false);
     };
 
     recogRef.current = recog;
+    return recog;
+  }, [finish]);
 
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setSupported(Boolean(SR));
+  }, []);
+
+  useEffect(() => {
     return () => {
       wantsMicRef.current = false;
       try {
-        recog.stop();
+        recogRef.current?.stop();
       } catch {
         /* nothing to stop */
       }
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [finish]);
+  }, []);
 
   const start = useCallback(async () => {
-    if (!recogRef.current) return;
+    if (!supported) return;
     bufferRef.current = "";
     setHeard("");
     setInterim(false);
     setError(null);
     wantsMicRef.current = true;
 
-    // Holding one stream open keeps the permission grant alive for the session.
-    if (!streamRef.current && navigator.mediaDevices?.getUserMedia) {
+    // Holding one stream open keeps the permission grant alive for the
+    // session. Safari's own mic acquisition already persists across
+    // sessions, and a second, separately-held stream risks contending with
+    // it for the input on iOS, so this is skipped there.
+    if (!SKIP_STREAM_PRIMING && !streamRef.current && navigator.mediaDevices?.getUserMedia) {
       try {
         streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
@@ -170,12 +189,14 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       }
     }
 
+    const recog = spawn();
+    if (!recog) return;
     try {
-      recogRef.current.start();
+      recog.start();
     } catch {
       /* already running */
     }
-  }, []);
+  }, [spawn, supported]);
 
   const stop = useCallback(() => finish(true), [finish]);
 

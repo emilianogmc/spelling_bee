@@ -32,7 +32,7 @@ export function useSpeechSynth() {
     (text, { rate = 0.8, spellOut = false, onEnd } = {}) => {
       if (!supported || !text) return;
       const token = (tokenRef.current += 1);
-      window.speechSynthesis.cancel();
+      const isCurrent = () => tokenRef.current === token;
 
       const payload = spellOut
         ? text.toUpperCase().split("").join(", ")
@@ -41,7 +41,6 @@ export function useSpeechSynth() {
       if (voiceRef.current) utterance.voice = voiceRef.current;
       utterance.lang = "en-US";
       utterance.rate = rate;
-      const isCurrent = () => tokenRef.current === token;
       utterance.onstart = () => {
         if (isCurrent()) setSpeaking(true);
       };
@@ -53,7 +52,14 @@ export function useSpeechSynth() {
       utterance.onerror = () => {
         if (isCurrent()) setSpeaking(false);
       };
-      window.speechSynthesis.speak(utterance);
+
+      // Safari silently drops an utterance queued in the same tick as
+      // cancel() — a long-standing WebKit race — so the two are separated by
+      // a beat too short to notice.
+      window.speechSynthesis.cancel();
+      setTimeout(() => {
+        if (isCurrent()) window.speechSynthesis.speak(utterance);
+      }, 50);
     },
     [supported]
   );

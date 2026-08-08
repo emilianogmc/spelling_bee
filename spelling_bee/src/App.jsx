@@ -11,9 +11,11 @@ import { isIOS } from "./lib/platform.js";
 /** A beat of silence after the voice stops, so the mic doesn't catch the tail. */
 const MIC_ARM_DELAY = 300;
 
+const IOS_DEVICE = isIOS();
+
 // iOS Safari rejects a mic start that isn't inside a direct tap, so auto-mic
 // can only run on platforms without that restriction.
-const AUTO_MIC_CAPABLE = !isIOS();
+const AUTO_MIC_CAPABLE = !IOS_DEVICE;
 
 export default function App() {
   const {
@@ -198,6 +200,7 @@ export default function App() {
               micSupported={micSupported}
               autoMic={autoMic}
               autoMicCapable={AUTO_MIC_CAPABLE}
+              iosDevice={IOS_DEVICE}
               onToggleAutoMic={toggleAutoMic}
               heard={heard}
               interim={interim}
