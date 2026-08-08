@@ -233,12 +233,30 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
         }
 
         let best = "";
+        let matched = false;
 
-        for (let j = 0; j < result.length; j++) {
-          const candidate = transcriptToLetters(result[j].transcript, goal);
-          if (!best) best = candidate;
-          if (goal && bufferRef.current + candidate === goal) {
-            best = candidate;
+        // Safari transcribes spelled-out letters as one run-together word:
+        // "P", "PR", "PRO" … "PROFLIGATE". Once that reaches the target, the
+        // ritual rule that strips the spoken word deletes the spelling itself
+        // — so a correct answer is thrown away for being correct, and a
+        // misheard alternative ("BROFLIGATE") wins by default. Each
+        // alternative is therefore read both ways, and a reading that
+        // completes the word beats one that strips to nothing.
+        for (let j = 0; j < result.length && !matched; j++) {
+          const raw = result[j].transcript;
+
+          const stripped = transcriptToLetters(raw, goal);
+          if (!best) best = stripped;
+          if (goal && bufferRef.current + stripped === goal) {
+            best = stripped;
+            matched = true;
+            break;
+          }
+
+          const literal = transcriptToLetters(raw, "");
+          if (goal && bufferRef.current + literal === goal) {
+            best = literal;
+            matched = true;
             break;
           }
         }
