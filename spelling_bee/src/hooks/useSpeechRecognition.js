@@ -22,6 +22,16 @@ import { splitOnRestart, transcriptToLetters } from "../lib/letters.js";
 // this; it only exists so a recogniser that never fires it can't hang the turn.
 const SETTLE_MS = 1500;
 
+// An exact match used to be the only way a session could end itself, which
+// punished exactly one person: the speller who got it right. Their last letter
+// has to be transcribed before the match can fire, and if it arrives late or
+// slightly wrong the recogniser just kept respawning forever. So silence ends
+// the turn too — generously, since spellers pause to think mid-word.
+const IDLE_MS = 3000;
+// One letter short of the target and matching so far: the trailing letter is
+// probably still in flight, so it gets noticeably longer to land.
+const NEARLY_DONE_IDLE_MS = 4000;
+
 export function useSpeechRecognition({ target, onResult, onRestart }) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -42,6 +52,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
   // actually finished draining its audio.
   const deliverOnEndRef = useRef(false);
   const settleTimerRef = useRef(null);
+  const idleTimerRef = useRef(null);
 
   // A new word earns a fresh start-over.
   useEffect(() => {
@@ -72,6 +83,13 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     if (settleTimerRef.current) {
       clearTimeout(settleTimerRef.current);
       settleTimerRef.current = null;
+    }
+  }, []);
+
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
     }
   }, []);
 
@@ -106,6 +124,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
   const finish = useCallback(
     (deliver, { immediate = false } = {}) => {
       wantsMicRef.current = false;
+      clearIdleTimer();
 
       if (!deliver || immediate) {
         deliverOnEndRef.current = false;
@@ -127,7 +146,26 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       clearSettleTimer();
       settleTimerRef.current = setTimeout(deliverBuffer, SETTLE_MS);
     },
-    [clearSettleTimer, deliverBuffer, flushPending, halt]
+    [clearIdleTimer, clearSettleTimer, deliverBuffer, flushPending, halt]
+  );
+
+  /**
+   * Restarts the "they've stopped spelling" countdown. Called on every result
+   * and on every respawn, so it only actually fires once letters stop arriving.
+   * Nothing heard yet means the speller hasn't begun — that waits indefinitely.
+   */
+  const armIdle = useCallback(
+    (goal, soFar) => {
+      clearIdleTimer();
+      if (!soFar) return;
+      const oneAway =
+        goal && goal.length - soFar.length === 1 && goal.startsWith(soFar);
+      idleTimerRef.current = setTimeout(
+        () => finish(true, { immediate: true }),
+        oneAway ? NEARLY_DONE_IDLE_MS : IDLE_MS
+      );
+    },
+    [clearIdleTimer, finish]
   );
 
   // Builds and wires a brand-new recognizer. Called for every start() and
@@ -195,9 +233,14 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       // finalise the last letter adds a second or more of dead air on a word
       // the speller has already finished. The word is complete, so there is
       // nothing left in flight to settle for.
-      if (goal && bufferRef.current + pending === goal) {
+      const soFar = bufferRef.current + pending;
+      if (goal && soFar === goal) {
         finish(true, { immediate: true });
+        return;
       }
+
+      // Letters are still coming in, so push the silence deadline back.
+      armIdle(goal, soFar);
     };
 
     recog.onerror = (event) => {
@@ -235,10 +278,21 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
         if (next) {
           try {
             next.start();
+            // The gap between instances is dead air, so the countdown has to
+            // survive it — otherwise a speller who pauses before their last
+            // letter is judged during the handover.
+            armIdle(goal, bufferRef.current);
             return;
           } catch {
             /* fall through to stopped state */
           }
+        }
+
+        // No recogniser could be restarted, so this is the end of the turn —
+        // hand over what was heard rather than leaving the speller stuck.
+        if (bufferRef.current) {
+          finish(true, { immediate: true });
+          return;
         }
       }
       setListening(false);
@@ -246,7 +300,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
     recogRef.current = recog;
     return recog;
-  }, [deliverBuffer, finish, flushPending]);
+  }, [armIdle, deliverBuffer, finish, flushPending]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -258,6 +312,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       wantsMicRef.current = false;
       deliverOnEndRef.current = false;
       if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       try {
         recogRef.current?.stop();
       } catch {
@@ -276,6 +331,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     // A new session cancels any delivery the previous one still owed.
     deliverOnEndRef.current = false;
     clearSettleTimer();
+    clearIdleTimer();
     bufferRef.current = "";
     pendingRef.current = "";
     setHeard("");
@@ -290,17 +346,18 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     } catch {
       /* already running */
     }
-  }, [clearSettleTimer, spawn, supported]);
+  }, [clearIdleTimer, clearSettleTimer, spawn, supported]);
 
   const stop = useCallback(() => finish(true), [finish]);
 
   const reset = useCallback(() => {
+    clearIdleTimer();
     if (wantsMicRef.current) finish(false);
     bufferRef.current = "";
     pendingRef.current = "";
     setHeard("");
     setInterim(false);
-  }, [finish]);
+  }, [clearIdleTimer, finish]);
 
   return { supported, listening, heard, interim, error, restartUsed, start, stop, reset };
 }

@@ -37,6 +37,13 @@ it to finish reading the audio it already captured, so the answer is taken once
 it has actually ended rather than the instant the button is pressed. Without
 that, the final letter — still being transcribed — was lost.
 
+Spelling the word correctly submits it the moment the letters match. Falling
+silent submits it too, after about three seconds — four when the spelling is one
+letter short of the target, since that last letter is usually still being
+transcribed. Before that, an exact match was the only way a turn could end, so a
+correct speller whose final letter arrived late or garbled was left listening
+forever.
+
 When the mic mishears a letter, say the letter word instead: "papa" for P,
 "bravo" for B, "delta" for D. Full NATO alphabet is supported.
 
