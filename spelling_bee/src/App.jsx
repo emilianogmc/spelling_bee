@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DrillCard from "./components/DrillCard.jsx";
 import ProgressComb from "./components/ProgressComb.jsx";
+import TtsDebug from "./components/TtsDebug.jsx";
 import WordListEditor from "./components/WordListEditor.jsx";
 import { useDrill } from "./hooks/useDrill.js";
 import { useSpeechSynth } from "./hooks/useSpeechSynth.js";
@@ -16,6 +17,10 @@ const IOS_DEVICE = isIOS();
 // iOS Safari rejects a mic start that isn't inside a direct tap, so auto-mic
 // can only run on platforms without that restriction.
 const AUTO_MIC_CAPABLE = !IOS_DEVICE;
+
+const TTS_DEBUG =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("debug") === "tts";
 
 export default function App() {
   const {
@@ -40,13 +45,38 @@ export default function App() {
     () => AUTO_MIC_CAPABLE && loadStored(KEY_AUTOMIC, true) !== false
   );
 
-  const { speak, cancel, speaking } = useSpeechSynth();
+  const {
+    speak,
+    cancel,
+    speaking,
+    error: ttsError,
+    log: ttsLog,
+    snapshot: ttsSnapshot,
+  } = useSpeechSynth();
 
   // say() and armMic() are defined below the recognition hook but are needed by
   // its callbacks, so they are reached through refs.
   const sayRef = useRef(null);
   const armMicRef = useRef(null);
   const armTimerRef = useRef(null);
+  // Chrome refuses — and can wedge on — speech queued before the first
+  // interaction, so the word is not read aloud until the page has been touched.
+  const interactedRef = useRef(false);
+  const [interacted, setInteracted] = useState(false);
+
+  useEffect(() => {
+    if (interacted) return undefined;
+    const unlock = () => {
+      interactedRef.current = true;
+      setInteracted(true);
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [interacted]);
 
   useEffect(() => saveStored(KEY_AUTOMIC, autoMic), [autoMic]);
 
@@ -117,11 +147,13 @@ export default function App() {
 
   useEffect(() => clearArmTimer, [clearArmTimer]);
 
-  // Say each new word and clear the previous attempt.
+  // Say each new word and clear the previous attempt. The very first word waits
+  // for a tap: speaking before any interaction is refused by Chrome and can
+  // leave the synthesiser unable to speak for the rest of the page's life.
   useEffect(() => {
     setAnswer("");
     resetMic();
-    say(current);
+    if (interactedRef.current) say(current);
     // Rate changes shouldn't re-trigger speech on their own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
@@ -205,6 +237,7 @@ export default function App() {
               heard={heard}
               interim={interim}
               micError={micError}
+              ttsError={ttsError}
               restartUsed={restartUsed}
               feedback={feedback}
               onToggleEditor={() => setEditorOpen((open) => !open)}
@@ -212,6 +245,10 @@ export default function App() {
 
             {editorOpen && (
               <WordListEditor words={words} onSave={setWords} onReset={resetProgress} />
+            )}
+
+            {TTS_DEBUG && (
+              <TtsDebug snapshot={ttsSnapshot} log={ttsLog} error={ttsError} />
             )}
           </div>
 

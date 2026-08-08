@@ -41,6 +41,7 @@ export default function DrillCard({
   heard,
   interim,
   micError,
+  ttsError,
   restartUsed,
   feedback,
   onToggleEditor,
@@ -133,6 +134,12 @@ export default function DrillCard({
               ? "Open the mic as soon as the word is read (not on iPhone/iPad — tap the mic instead)"
               : "Open the mic as soon as the word is read"}
           </label>
+
+          {ttsError && ttsError !== "blocked-until-you-interact" && (
+            <p className="mt-2 font-mono text-[11px] text-miss">
+              speech failed: {ttsError}
+            </p>
+          )}
 
           <Feedback feedback={feedback} />
 
