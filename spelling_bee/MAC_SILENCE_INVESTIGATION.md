@@ -105,6 +105,52 @@ called, the attempt is presumed wedged: `cancel()` is called to clear the stuck
 state, and the utterance is retried, up to two additional attempts before surfacing
 `stuck-no-start` as a visible error instead of silence.
 
+### Round 4 — the watchdog fired, and retries didn't recover
+
+The watchdog worked exactly as built — and returned a worse result than hoped:
+
+```
+01:10.84 speak "abeyance" (busy=false)
+01:11.24 no start after 400ms — engine likely wedged
+01:11.24 retrying (2 left)
+01:11.64 no start after 400ms — engine likely wedged
+01:11.64 retrying (1 left)
+01:12.05 no start after 400ms — engine likely wedged
+01:12.05 gave up after retries
+01:12.06 error canceled
+```
+
+All three attempts failed identically — same 400 ms timeout each time, zero
+variance. That determinism matters: a *flaky* engine wedge would show some
+variation between attempts (one succeeding, or failing at a different point).
+Identical failure three times in a row instead points at the whole browser
+process's audio path being stuck for this session, not a per-call race that a
+JS-level retry can shake loose.
+
+**Current best explanation:** Chrome's audio output on macOS runs through an
+out-of-process, browser-wide audio service — shared across every tab, not scoped to
+the page. That service is known to wedge, and microphone/WebRTC capture sessions
+(which this app opens constantly, both manually and via auto-mic) are a documented
+trigger. Once wedged, the fix is normally **fully quitting and relaunching Chrome**
+(not just reloading the page or the tab) — a page has no API that can reach into
+that service and reset it.
+
+**Shipped alongside the watchdog data:** each retry now builds a genuinely fresh
+`SpeechSynthesisUtterance` rather than reusing one across `cancel()`, in case
+per-utterance engine state was carrying over. The final retry also drops the
+explicit `voice` assignment, to check whether the "Samantha" voice's specific engine
+binding was the stuck part rather than the engine as a whole. Neither is expected to
+fix a genuinely wedged audio service, but both close off two remaining code-level
+explanations before concluding it's outside the page's reach entirely.
+
+**Next diagnostic step — not yet run:** fully quit Chrome (Cmd+Q, not just closing
+the tab or window), relaunch, go straight to the site, and click the speaker once
+*before touching the mic at all*. If a clean process speaks correctly on the first
+try, the mic-contention theory is confirmed and the practical mitigation is
+reducing how aggressively this app opens the microphone on Chrome/macOS (auto-mic
+already defaults conservatively, but every recognition session — manual or
+automatic — is a fresh opportunity to trigger the underlying service bug).
+
 ---
 
 ## Read this first: what the two failed fixes tell us

@@ -126,37 +126,44 @@ export function useSpeechSynth() {
       clearWatchdog();
 
       const payload = spellOut ? text.toUpperCase().split("").join(", ") : text;
-      const utterance = new SpeechSynthesisUtterance(payload);
-      if (voiceRef.current) utterance.voice = voiceRef.current;
-      utterance.lang = "en-US";
-      utterance.rate = rate;
 
-      utterance.onstart = () => {
-        if (!isCurrent()) return;
-        clearWatchdog();
-        setSpeaking(true);
-        setError(null);
-        note(`start "${payload}"`);
-      };
-      utterance.onend = () => {
-        if (!isCurrent()) return;
-        clearWatchdog();
-        setSpeaking(false);
-        utteranceRef.current = null;
-        note("end");
-        onEnd?.();
-      };
-      utterance.onerror = (event) => {
-        if (!isCurrent()) return;
-        clearWatchdog();
-        setSpeaking(false);
-        utteranceRef.current = null;
-        const reason = event?.error || "unknown";
-        setError(reason);
-        note(`error ${reason}`);
-      };
+      // A fresh SpeechSynthesisUtterance per attempt, rather than reusing one
+      // across cancel()+retry — Chrome can carry stuck per-utterance engine
+      // state across a cancel. `withVoice=false` drops the explicit voice
+      // binding, in case that specific voice's engine handle is what's wedged
+      // rather than the engine as a whole.
+      const build = (withVoice) => {
+        const utterance = new SpeechSynthesisUtterance(payload);
+        if (withVoice && voiceRef.current) utterance.voice = voiceRef.current;
+        utterance.lang = "en-US";
+        utterance.rate = rate;
 
-      utteranceRef.current = utterance;
+        utterance.onstart = () => {
+          if (!isCurrent()) return;
+          clearWatchdog();
+          setSpeaking(true);
+          setError(null);
+          note(`start "${payload}"`);
+        };
+        utterance.onend = () => {
+          if (!isCurrent()) return;
+          clearWatchdog();
+          setSpeaking(false);
+          utteranceRef.current = null;
+          note("end");
+          onEnd?.();
+        };
+        utterance.onerror = (event) => {
+          if (!isCurrent()) return;
+          clearWatchdog();
+          setSpeaking(false);
+          utteranceRef.current = null;
+          const reason = event?.error || "unknown";
+          setError(reason);
+          note(`error ${reason}`);
+        };
+        return utterance;
+      };
 
       // A synthesiser left paused swallows everything queued after it.
       if (synth.paused) {
@@ -166,8 +173,14 @@ export function useSpeechSynth() {
 
       // Desktop Chrome can accept an utterance and latch .speaking true while
       // never actually starting it — no onstart, no onerror, no audio, and no
-      // way out except cancelling and trying again.
-      const armWatchdog = (retriesLeft) => {
+      // way out except cancelling and trying again with a new utterance.
+      const attempt = (retriesLeft) => {
+        const withVoice = retriesLeft > 0;
+        const utterance = build(withVoice);
+        utteranceRef.current = utterance;
+        note(`speak "${payload}"${withVoice ? "" : " (no explicit voice)"}`);
+        synth.speak(utterance);
+
         watchdogRef.current = setTimeout(() => {
           watchdogRef.current = null;
           if (!isCurrent()) return;
@@ -175,8 +188,10 @@ export function useSpeechSynth() {
           synth.cancel();
           if (retriesLeft > 0) {
             note(`retrying (${retriesLeft} left)`);
-            synth.speak(utterance);
-            armWatchdog(retriesLeft - 1);
+            timerRef.current = setTimeout(() => {
+              timerRef.current = null;
+              if (isCurrent()) attempt(retriesLeft - 1);
+            }, 150);
           } else {
             note("gave up after retries");
             setError("stuck-no-start");
@@ -186,14 +201,13 @@ export function useSpeechSynth() {
       };
 
       const busy = synth.speaking || synth.pending;
-      note(`speak "${payload}" (busy=${busy})`);
+      note(`busy=${busy} before "${payload}"`);
 
       if (!busy) {
-        // Nothing to interrupt, so queue it inside the click's own task —
-        // Safari wants speak() in the gesture's call stack, and there is no
-        // cancel() to race with.
-        synth.speak(utterance);
-        armWatchdog(MAX_RETRIES);
+        // Nothing to interrupt, so the first attempt queues inside the
+        // click's own task — Safari wants speak() in the gesture's call
+        // stack, and there is no cancel() to race with.
+        attempt(MAX_RETRIES);
         return;
       }
 
@@ -202,9 +216,7 @@ export function useSpeechSynth() {
       synth.cancel();
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        if (!isCurrent()) return;
-        synth.speak(utterance);
-        armWatchdog(MAX_RETRIES);
+        if (isCurrent()) attempt(MAX_RETRIES);
       }, 60);
     },
     [clearTimer, clearWatchdog, note, supported]
