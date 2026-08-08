@@ -32,6 +32,11 @@ fine, it just can't open itself.
 Spell out loud the way you would in competition — say the word, spell it, say it
 again. The parser strips the word itself from the transcript.
 
+Stopping the mic doesn't cut the recogniser off mid-thought: `stop()` only asks
+it to finish reading the audio it already captured, so the answer is taken once
+it has actually ended rather than the instant the button is pressed. Without
+that, the final letter — still being transcribed — was lost.
+
 When the mic mishears a letter, say the letter word instead: "papa" for P,
 "bravo" for B, "delta" for D. Full NATO alphabet is supported.
 
