@@ -50,6 +50,30 @@ Both earlier fixes were irrelevant to this: neither touched the page-load call.
 7. **`?debug=tts`** renders a live diagnostics panel: voice count, chosen voice,
    `speaking`/`pending`/`paused`, activation state, and a timestamped event log.
 
+### Round 2 — the fix above worked, and revealed a second bug
+
+A `?debug=tts` screenshot after the fix showed: `user activation: true`,
+`voices loaded: 199`, `chosen voice: Samantha · en-US · local`, `last error: none`.
+The activation gate is doing its job — nothing is blocked anymore.
+
+But the event log showed `speak "correction" (busy=true)` firing repeatedly, roughly
+every 130–580ms, **with zero `start` entries in between.** Every call found the
+synthesiser already busy, cancelled it, and requeued — so each utterance was killed
+before its own `onstart` could ever fire. The 60 ms cancel→speak gap (added for the
+now-ruled-out Safari race) was exactly wide enough for the next call to land inside it.
+
+The timing pattern (tight at first, stretching out over time) is the signature of a
+person clicking the button repeatedly because nothing seemed to happen — which then
+cancelled every attempt, plausibly including the first one, creating a self-sustaining
+loop with no way to escape it by clicking harder.
+
+**Fix:** a click landing within 400 ms of the last one, while something is still
+speaking or pending, is ignored instead of allowed to cancel what's in flight. This
+gives every utterance a window to actually reach `onstart` before it can be
+interrupted. The debug log also now collapses consecutive identical lines into a
+counter (`×N`) instead of letting a rapid-click storm push the earliest — most
+diagnostic — entries out of the 20-line window.
+
 ---
 
 ## Read this first: what the two failed fixes tell us

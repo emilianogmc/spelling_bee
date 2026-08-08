@@ -15,7 +15,11 @@ function hasUserActivation() {
   return activation.hasBeenActive;
 }
 
-const LOG_LIMIT = 12;
+const LOG_LIMIT = 20;
+// A click landing this soon after the last one is treated as an accidental
+// repeat (double-fire, impatient re-click) rather than a fresh request, so it
+// can't cancel an utterance before it has had a chance to actually start.
+const REPEAT_GUARD_MS = 400;
 
 export function useSpeechSynth() {
   const voiceRef = useRef(null);
@@ -24,6 +28,7 @@ export function useSpeechSynth() {
   const utteranceRef = useRef(null);
   const tokenRef = useRef(0);
   const timerRef = useRef(null);
+  const lastSpeakAtRef = useRef(0);
 
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState(null);
@@ -31,9 +36,22 @@ export function useSpeechSynth() {
 
   const supported = typeof window !== "undefined" && "speechSynthesis" in window;
 
+  // Repeated identical lines (a rapid-click storm) collapse into one entry
+  // with a counter, so the log keeps its earliest — and most diagnostic —
+  // entries instead of being pushed out by duplicates.
   const note = useCallback((entry) => {
     const stamp = new Date().toISOString().slice(14, 22);
-    setLog((prev) => [...prev.slice(-(LOG_LIMIT - 1)), `${stamp} ${entry}`]);
+    setLog((prev) => {
+      const last = prev[prev.length - 1];
+      if (last) {
+        const match = last.match(/^(\d\d:\d\d\.\d\d) (.*?)(?: ×(\d+))?$/);
+        if (match && match[2] === entry) {
+          const count = (match[3] ? Number(match[3]) : 1) + 1;
+          return [...prev.slice(0, -1), `${stamp} ${entry} ×${count}`];
+        }
+      }
+      return [...prev.slice(-(LOG_LIMIT - 1)), `${stamp} ${entry}`];
+    });
   }, []);
 
   useEffect(() => {
@@ -75,6 +93,18 @@ export function useSpeechSynth() {
         note(`skipped "${text}" — no user activation yet`);
         return;
       }
+
+      // A click landing within the guard window of the last one is ignored
+      // rather than allowed to cancel what's in flight. Without this, rapid
+      // re-clicks cancel each other in a chain and nothing is ever audible:
+      // every attempt dies before its own onstart can fire.
+      const now = Date.now();
+      const sinceLast = now - lastSpeakAtRef.current;
+      if (sinceLast < REPEAT_GUARD_MS && (synth.speaking || synth.pending)) {
+        note(`held off repeat "${text}" (${sinceLast}ms since last)`);
+        return;
+      }
+      lastSpeakAtRef.current = now;
 
       const token = (tokenRef.current += 1);
       const isCurrent = () => tokenRef.current === token;
