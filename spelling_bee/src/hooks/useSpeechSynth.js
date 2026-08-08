@@ -20,6 +20,12 @@ const LOG_LIMIT = 20;
 // repeat (double-fire, impatient re-click) rather than a fresh request, so it
 // can't cancel an utterance before it has had a chance to actually start.
 const REPEAT_GUARD_MS = 400;
+// Desktop Chrome has a long-standing bug where speak() silently wedges:
+// .speaking latches true, onstart never fires, and nothing plays or errors —
+// forever, until something forces it loose. This is how long onstart gets
+// before that's assumed to have happened.
+const WATCHDOG_MS = 400;
+const MAX_RETRIES = 2;
 
 export function useSpeechSynth() {
   const voiceRef = useRef(null);
@@ -28,6 +34,7 @@ export function useSpeechSynth() {
   const utteranceRef = useRef(null);
   const tokenRef = useRef(0);
   const timerRef = useRef(null);
+  const watchdogRef = useRef(null);
   const lastSpeakAtRef = useRef(0);
 
   const [speaking, setSpeaking] = useState(false);
@@ -83,6 +90,13 @@ export function useSpeechSynth() {
     }
   }, []);
 
+  const clearWatchdog = useCallback(() => {
+    if (watchdogRef.current) {
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+  }, []);
+
   const speak = useCallback(
     (text, { rate = 0.8, spellOut = false, onEnd } = {}) => {
       if (!supported || !text) return;
@@ -109,6 +123,7 @@ export function useSpeechSynth() {
       const token = (tokenRef.current += 1);
       const isCurrent = () => tokenRef.current === token;
       clearTimer();
+      clearWatchdog();
 
       const payload = spellOut ? text.toUpperCase().split("").join(", ") : text;
       const utterance = new SpeechSynthesisUtterance(payload);
@@ -118,12 +133,14 @@ export function useSpeechSynth() {
 
       utterance.onstart = () => {
         if (!isCurrent()) return;
+        clearWatchdog();
         setSpeaking(true);
         setError(null);
         note(`start "${payload}"`);
       };
       utterance.onend = () => {
         if (!isCurrent()) return;
+        clearWatchdog();
         setSpeaking(false);
         utteranceRef.current = null;
         note("end");
@@ -131,6 +148,7 @@ export function useSpeechSynth() {
       };
       utterance.onerror = (event) => {
         if (!isCurrent()) return;
+        clearWatchdog();
         setSpeaking(false);
         utteranceRef.current = null;
         const reason = event?.error || "unknown";
@@ -146,6 +164,27 @@ export function useSpeechSynth() {
         note("resumed a paused synthesiser");
       }
 
+      // Desktop Chrome can accept an utterance and latch .speaking true while
+      // never actually starting it — no onstart, no onerror, no audio, and no
+      // way out except cancelling and trying again.
+      const armWatchdog = (retriesLeft) => {
+        watchdogRef.current = setTimeout(() => {
+          watchdogRef.current = null;
+          if (!isCurrent()) return;
+          note(`no start after ${WATCHDOG_MS}ms — engine likely wedged`);
+          synth.cancel();
+          if (retriesLeft > 0) {
+            note(`retrying (${retriesLeft} left)`);
+            synth.speak(utterance);
+            armWatchdog(retriesLeft - 1);
+          } else {
+            note("gave up after retries");
+            setError("stuck-no-start");
+            setSpeaking(false);
+          }
+        }, WATCHDOG_MS);
+      };
+
       const busy = synth.speaking || synth.pending;
       note(`speak "${payload}" (busy=${busy})`);
 
@@ -154,6 +193,7 @@ export function useSpeechSynth() {
         // Safari wants speak() in the gesture's call stack, and there is no
         // cancel() to race with.
         synth.speak(utterance);
+        armWatchdog(MAX_RETRIES);
         return;
       }
 
@@ -162,19 +202,22 @@ export function useSpeechSynth() {
       synth.cancel();
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        if (isCurrent()) synth.speak(utterance);
+        if (!isCurrent()) return;
+        synth.speak(utterance);
+        armWatchdog(MAX_RETRIES);
       }, 60);
     },
-    [clearTimer, note, supported]
+    [clearTimer, clearWatchdog, note, supported]
   );
 
   const cancel = useCallback(() => {
     tokenRef.current += 1;
     clearTimer();
+    clearWatchdog();
     if (supported) window.speechSynthesis.cancel();
     utteranceRef.current = null;
     setSpeaking(false);
-  }, [clearTimer, supported]);
+  }, [clearTimer, clearWatchdog, supported]);
 
   // Live state for the ?debug=tts panel.
   const snapshot = useCallback(() => {

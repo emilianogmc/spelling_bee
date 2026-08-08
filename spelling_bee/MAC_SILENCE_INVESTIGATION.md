@@ -74,6 +74,37 @@ interrupted. The debug log also now collapses consecutive identical lines into a
 counter (`×N`) instead of letting a rapid-click storm push the earliest — most
 diagnostic — entries out of the 20-line window.
 
+### Round 3 — narrowed to Chrome specifically, and the real Chrome bug found
+
+New information: **Safari on the Mac speaks correctly. Chrome on the same Mac does
+not.** That single fact eliminates every remaining macOS-level theory (output
+routing, muting, Bluetooth, voice assets not downloaded) — those would affect both
+browsers identically.
+
+A `?debug=tts` screenshot with the debounce fix in place showed the smoking gun:
+
+```
+47:25.90 speak "amputate" (busy=false)
+47:40.75 speak "amputate" (busy=true)
+```
+
+The first call had a clean shot — `busy=false`, nothing to interrupt, straight to
+`synth.speak()`. Fifteen seconds later, `synth.speaking` was still latched `true`,
+with **no `start` line ever logged.** The utterance was accepted by Chrome's engine,
+`.speaking` flipped true, and then nothing happened — no audio, no `onstart`, no
+`onerror`, indefinitely.
+
+This is a well-documented, long-standing bug specific to desktop Chrome's
+`speechSynthesis` implementation (open in Chromium's tracker for years): `speak()`
+can silently wedge the engine with no error and no way out except forcing it loose.
+Safari talks to the OS speech engine through a different path and isn't affected,
+which is exactly the split observed.
+
+**Fix:** a watchdog. If `onstart` hasn't fired within 400 ms of `speak()` being
+called, the attempt is presumed wedged: `cancel()` is called to clear the stuck
+state, and the utterance is retried, up to two additional attempts before surfacing
+`stuck-no-start` as a visible error instead of silence.
+
 ---
 
 ## Read this first: what the two failed fixes tell us
