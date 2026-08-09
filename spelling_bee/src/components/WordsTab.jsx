@@ -1,5 +1,51 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
+import { KEY_DRAFT, loadStored, saveStored } from "../lib/progress.js";
+
+/**
+ * What is actually going to be saved, and what it costs.
+ *
+ * Two spellings that differ only in case are one word to the drill — it scores
+ * on a lowercased comparison — but two cells in the comb and two entries in the
+ * queue, so a pasted list with duplicates quietly drills some words twice. They
+ * are folded here, first spelling wins, and the count says so before saving.
+ */
+function readDraft(draft, words) {
+  const lines = draft.split("\n").map((line) => line.trim()).filter(Boolean);
+
+  const seen = new Set();
+  const parsed = [];
+  lines.forEach((word) => {
+    const key = word.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    parsed.push(word);
+  });
+
+  const saved = new Set(words.map((word) => word.toLowerCase()));
+  return {
+    parsed,
+    duplicates: lines.length - parsed.length,
+    added: parsed.filter((word) => !saved.has(word.toLowerCase())).length,
+    removed: words.filter((word) => !seen.has(word.toLowerCase())).length,
+    dirty: parsed.join("\n") !== words.join("\n"),
+  };
+}
+
+/** One line of plain arithmetic under the box, so nothing about a paste is a
+    surprise until after it lands. */
+function summarise({ parsed, duplicates, added, removed, dirty }) {
+  if (!parsed.length) return "Nothing to save. Add at least one word.";
+
+  const counted = `${parsed.length} ${parsed.length === 1 ? "word" : "words"}.`;
+  if (!dirty && !duplicates) return counted;
+
+  const changes = [];
+  if (added) changes.push(`${added} added`);
+  if (removed) changes.push(`${removed} removed`);
+  if (duplicates) changes.push(`${duplicates} duplicate${duplicates === 1 ? "" : "s"} folded`);
+  return `${counted} ${changes.join(", ")}.`;
+}
 
 export default function WordsTab({
   words,
@@ -12,24 +58,86 @@ export default function WordsTab({
   micSupported,
   onToggleAutoMic,
 }) {
-  const [draft, setDraft] = useState(() => words.join("\n"));
+  // An edit outlives the tab. This component unmounts the moment the speller
+  // checks something in Practice, which used to throw away everything typed.
+  const [draft, setDraft] = useState(() => {
+    const stored = loadStored(KEY_DRAFT, null);
+    return typeof stored === "string" ? stored : words.join("\n");
+  });
   const [confirmingReset, setConfirmingReset] = useState(false);
 
+  // Only a save — or an edit in another tab — should overwrite what is in the
+  // box. Comparing identity rather than contents keeps the restored draft
+  // through the mount, where a plain [words] effect would wipe it.
+  const savedRef = useRef(words);
   useEffect(() => {
+    if (savedRef.current === words) return;
+    savedRef.current = words;
     setDraft(words.join("\n"));
   }, [words]);
 
-  const parsed = draft
-    .split("\n")
-    .map((word) => word.trim())
-    .filter(Boolean);
-  const dirty = parsed.join("\n") !== words.join("\n");
+  useEffect(() => saveStored(KEY_DRAFT, draft), [draft]);
+
+  const state = useMemo(() => readDraft(draft, words), [draft, words]);
+  const { parsed, dirty } = state;
 
   return (
     <div className="flex flex-col gap-8">
+      {/* The list is what the tab is named after, so it opens the tab. Voice
+          settings are set once and left alone; they used to sit on top of it. */}
+      <section>
+        <h2 className="mb-1 font-display text-xl font-semibold">Word list</h2>
+        <p className="mb-4 text-[14px] text-sage">One word per line.</p>
+
+        <textarea
+          value={draft}
+          spellCheck="false"
+          onChange={(event) => setDraft(event.target.value)}
+          aria-label="Word list, one word per line"
+          aria-describedby="list-summary"
+          autoCapitalize="off"
+          autoCorrect="off"
+          /* 16px, not the 13 it was: Safari zooms the page on any field under
+             16 and this one is read as much as it is typed into. */
+          className="min-h-[min(46vh,420px)] w-full resize-y rounded-xl border border-dim bg-surface p-3.5 font-mono text-base leading-relaxed text-cream outline-none focus:border-honey"
+        />
+
+        <p id="list-summary" aria-live="polite" className="mt-2 text-[14px] text-sage">
+          {summarise(state)}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => onSave(parsed)}
+          disabled={!dirty || parsed.length === 0}
+          /* Ink on honey is 6.6:1 at any size; the label stays large because
+             this section has one obvious action, not to prop up contrast.
+             Nothing to save is a resting state rather than a broken button, so
+             it goes neutral instead of dimming the fill into an unreadable
+             slab. */
+          className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border-2 border-honey bg-honey text-[19px] font-bold text-ink transition-colors hover:border-honeypale hover:bg-honeypale disabled:cursor-default disabled:border-dim disabled:bg-transparent disabled:text-sage"
+        >
+          <Save size={19} aria-hidden="true" /> {dirty ? "Save word list" : "Saved"}
+        </button>
+
+        {/* A draft that survives the tab has to be escapable, or a bad paste
+            follows the speller around. */}
+        {dirty && (
+          <button
+            type="button"
+            onClick={() => setDraft(words.join("\n"))}
+            className="mx-auto mt-1 flex min-h-[44px] items-center px-3 text-[14px] text-sage transition-colors hover:text-cream"
+          >
+            Discard changes
+          </button>
+        )}
+      </section>
+
       <section>
         <h2 className="mb-1 font-display text-xl font-semibold">Voice</h2>
-        <p className="mb-4 text-[14px] text-sage">How the word is read, and when the mic opens.</p>
+        <p className="mb-4 text-[14px] text-sage">
+          How the word is read, and when the mic opens.
+        </p>
 
         <div className="rounded-xl border border-line bg-surface px-4 py-4">
           <label htmlFor="rate" className="block text-[15px] font-medium text-cream">
@@ -74,35 +182,6 @@ export default function WordsTab({
             </span>
           </span>
         </label>
-      </section>
-
-      <section>
-        <h2 className="mb-1 font-display text-xl font-semibold">Word list</h2>
-        <p className="mb-4 text-[14px] text-sage">
-          One word per line. {words.length} in the list now.
-        </p>
-
-        <textarea
-          value={draft}
-          spellCheck="false"
-          onChange={(event) => setDraft(event.target.value)}
-          aria-label="Word list, one word per line"
-          className="min-h-[220px] w-full resize-y rounded-xl border border-dim bg-surface p-3.5 font-mono text-[13px] leading-relaxed text-cream outline-none focus:border-honey"
-        />
-
-        <button
-          type="button"
-          onClick={() => onSave(parsed)}
-          disabled={!dirty || parsed.length === 0}
-          /* Ink on honey is 6.6:1 at any size; the label stays large because
-             this section has one obvious action, not to prop up contrast.
-             Nothing to save is a resting state rather than a broken button, so
-             it goes neutral instead of dimming the fill into an unreadable
-             slab. */
-          className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border-2 border-honey bg-honey text-[19px] font-bold text-ink transition-colors hover:border-honeypale hover:bg-honeypale disabled:cursor-default disabled:border-dim disabled:bg-transparent disabled:text-sage"
-        >
-          <Save size={19} aria-hidden="true" /> {dirty ? "Save word list" : "Saved"}
-        </button>
       </section>
 
       <section>
