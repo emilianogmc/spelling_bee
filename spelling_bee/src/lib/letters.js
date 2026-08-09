@@ -70,7 +70,12 @@ const CONFUSABLE = [
 ];
 
 export function isConfusable(a, b) {
-  return CONFUSABLE.some((pair) => pair.includes(a) && pair.includes(b));
+  return a !== b && CONFUSABLE.some((pair) => pair.includes(a) && pair.includes(b));
+}
+
+/** Spellings are always shown letter-separated, never as a solid word. */
+export function spaced(word) {
+  return (word || "").toUpperCase().split("").join("-");
 }
 
 /**

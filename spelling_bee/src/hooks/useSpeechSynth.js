@@ -99,7 +99,13 @@ export function useSpeechSynth() {
 
   const speak = useCallback(
     (text, { rate = 0.8, spellOut = false, onEnd } = {}) => {
-      if (!supported || !text) return;
+      if (!text) return;
+      // No synthesiser at all still has to release the caller, or a drill that
+      // opens the mic from onEnd never opens it once.
+      if (!supported) {
+        onEnd?.();
+        return;
+      }
       const synth = window.speechSynthesis;
 
       if (!hasUserActivation()) {
@@ -122,6 +128,15 @@ export function useSpeechSynth() {
 
       const token = (tokenRef.current += 1);
       const isCurrent = () => tokenRef.current === token;
+      // The caller re-opens the mic from onEnd, so every way this can finish —
+      // spoken, errored, or a wedged engine we gave up on — has to reach it,
+      // exactly once. Missing it leaves the mic shut for the rest of the drill.
+      let handedOff = false;
+      const handOff = () => {
+        if (handedOff) return;
+        handedOff = true;
+        onEnd?.();
+      };
       clearTimer();
       clearWatchdog();
 
@@ -138,29 +153,36 @@ export function useSpeechSynth() {
         utterance.lang = "en-US";
         utterance.rate = rate;
 
+        // A retry cancels the previous attempt, and that cancel fires a late
+        // error event on an utterance we have already abandoned. The token
+        // alone can't tell the two apart — both belong to this speak() call —
+        // so liveness is pinned to the utterance the ref currently holds.
+        const isLive = () => isCurrent() && utteranceRef.current === utterance;
+
         utterance.onstart = () => {
-          if (!isCurrent()) return;
+          if (!isLive()) return;
           clearWatchdog();
           setSpeaking(true);
           setError(null);
           note(`start "${payload}"`);
         };
         utterance.onend = () => {
-          if (!isCurrent()) return;
+          if (!isLive()) return;
           clearWatchdog();
           setSpeaking(false);
           utteranceRef.current = null;
           note("end");
-          onEnd?.();
+          handOff();
         };
         utterance.onerror = (event) => {
-          if (!isCurrent()) return;
+          if (!isLive()) return;
           clearWatchdog();
           setSpeaking(false);
           utteranceRef.current = null;
           const reason = event?.error || "unknown";
           setError(reason);
           note(`error ${reason}`);
+          handOff();
         };
         return utterance;
       };
@@ -185,6 +207,9 @@ export function useSpeechSynth() {
           watchdogRef.current = null;
           if (!isCurrent()) return;
           note(`no start after ${WATCHDOG_MS}ms — engine likely wedged`);
+          // Drop the abandoned utterance before cancelling, so the error event
+          // that cancel() raises is ignored rather than read as a real failure.
+          utteranceRef.current = null;
           synth.cancel();
           if (retriesLeft > 0) {
             note(`retrying (${retriesLeft} left)`);
@@ -196,6 +221,7 @@ export function useSpeechSynth() {
             note("gave up after retries");
             setError("stuck-no-start");
             setSpeaking(false);
+            handOff();
           }
         }, WATCHDOG_MS);
       };

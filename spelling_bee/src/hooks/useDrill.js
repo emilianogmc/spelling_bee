@@ -24,9 +24,16 @@ export function useDrill() {
 
   const queueRef = useRef([]);
   const timerRef = useRef(null);
+  // A correct answer advances on a timer set before the answer was recorded,
+  // so that closure's `progress` is one answer out of date — and rebuilding a
+  // filtered pool from it hands the word straight back.
+  const progressRef = useRef(progress);
 
   useEffect(() => saveStored(KEY_WORDS, words), [words]);
-  useEffect(() => saveStored(KEY_PROGRESS, progress), [progress]);
+  useEffect(() => {
+    progressRef.current = progress;
+    saveStored(KEY_PROGRESS, progress);
+  }, [progress]);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -40,10 +47,10 @@ export function useDrill() {
     setFeedback(null);
 
     if (queueRef.current.length === 0) {
-      queueRef.current = shuffle(poolFor(filter, words, progress));
+      queueRef.current = shuffle(poolFor(filter, words, progressRef.current));
     }
     setCurrent(queueRef.current.pop() ?? null);
-  }, [clearTimer, filter, words, progress]);
+  }, [clearTimer, filter, words]);
 
   // Rebuild the queue whenever the pool itself changes.
   useEffect(() => {
@@ -100,8 +107,11 @@ export function useDrill() {
         mastered: nextStreak >= MASTERY_STREAK,
       });
 
+      // A correct answer has nothing to read, so it moves on by itself and the
+      // speller never has to tap. A miss does — the verdict holds until they
+      // press Next, because no fixed delay is long enough for every word.
       clearTimer();
-      timerRef.current = setTimeout(advance, correct ? 900 : 3400);
+      if (correct) timerRef.current = setTimeout(advance, 900);
       return correct ? "correct" : "wrong";
     },
     [advance, clearTimer, current, progress]
@@ -130,7 +140,6 @@ export function useDrill() {
     setFilter,
     current,
     feedback,
-    setFeedback,
     submit,
     advance,
     counts,
