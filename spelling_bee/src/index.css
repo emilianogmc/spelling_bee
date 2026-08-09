@@ -1,38 +1,44 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #17130d;
-  --color-surface: #211b12;
-  --color-raised: #2b2317;
-  --color-line: #3a3020;
-  --color-honey: #e8a93b;
-  --color-honeydim: #8c6a2a;
-  --color-cream: #f5eedd;
-  --color-muted: #9c9080;
-  /* Verdict colours carry 14px text on their own tinted grounds, so they are
-     tuned for 4.5:1 there, not just against the page background. */
-  --color-ok: #a4cd6a;
-  --color-okdim: #243117;
-  --color-miss: #f0917a;
-  --color-missdim: #3d2018;
+  /* The four brand colours, and the tones derived where a given colour could
+     not carry a job. Ratios are measured against the ground each token is
+     actually used on, not against black.
+
+     #524646 is the brand's darkest given tone, but it is too light to be the
+     page: vermilion only reaches 2.6:1 on it, so the accent could be neither
+     text nor a focus ring. The page is that colour taken down to #241e1e,
+     which buys vermilion 4.8:1 — and #524646 keeps its place as the raised
+     tone, one step up from the page. */
+
+  --color-night: #241e1e; /* the page */
+  --color-surface: #2f2727; /* panels */
+  --color-raised: #524646; /* GIVEN — controls lifted off a panel */
+  --color-line: #8a7a7a; /* borders · 4.0:1 on night, 3.6:1 on surface */
+  --color-stone: #6b5f5f; /* inactive fills ONLY — an unlit pip, an untested cell */
+
+  --color-chalk: #fcf2e5; /* GIVEN — primary text 14.8:1 · the ground a miss sits on */
+  --color-muted: #a8a492; /* GIVEN — secondary text 6.6:1 on night, 5.8:1 on surface */
+  --color-ember: #ec5b38; /* GIVEN — accent 4.8:1: text, fill, and focus ring all work */
+  --color-moss: #a8c48a; /* correct · 4.8:1, and stays distinct from chalk under
+                            every kind of colour blindness, which red/green does not */
 
   --font-display: "Fraunces", ui-serif, serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Bottom navigation sits above content, below the verdict sheet. */
   --z-nav: 20;
-  --z-sheet: 30;
 
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 body {
-  background: var(--color-ink);
-  color: var(--color-cream);
+  background: var(--color-night);
+  color: var(--color-chalk);
   font-family: var(--font-sans);
   /* The drill is used one-handed on a phone; the tab bar owns the bottom. */
   padding-bottom: env(safe-area-inset-bottom);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Spelled-out letters are read character by character, so they get room to
@@ -43,9 +49,14 @@ body {
 }
 
 :where(button, a, input, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-honey);
+  outline: 2px solid var(--color-ember);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+::selection {
+  background: var(--color-ember);
+  color: var(--color-chalk);
 }
 
 .hex {
@@ -53,13 +64,15 @@ body {
 }
 
 input[type="range"] {
-  accent-color: var(--color-honey);
+  accent-color: var(--color-ember);
 }
 
-@keyframes sheet-rise {
+/* A verdict replacing the letters on the stage. Short, because the speller is
+   mid-drill and waiting on it. */
+@keyframes stage-in {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -67,18 +80,31 @@ input[type="range"] {
   }
 }
 
-.sheet-rise {
-  animation: sheet-rise 240ms var(--ease-out-quart) both;
+.stage-in {
+  animation: stage-in 200ms var(--ease-out-quart) both;
+}
+
+/* The mic is open. A pulsing dot says so without the whole button breathing,
+   which made the primary target look disabled on every other frame. */
+@keyframes live-dot {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+.live-dot {
+  animation: live-dot 1.4s var(--ease-out-quart) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-pulse {
+  /* State still has to be visible; it just stops moving. The dot holds at full
+     opacity rather than vanishing, and the verdict appears without travel. */
+  .live-dot {
     animation: none;
   }
 
-  /* The verdict still needs to appear; it just stops travelling. */
-  .sheet-rise {
-    animation-duration: 1ms;
+  .stage-in {
     animation-name: none;
   }
 

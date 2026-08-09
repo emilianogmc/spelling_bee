@@ -25,24 +25,24 @@ export default function SttDebug({ log, target, heard }) {
   };
 
   return (
-    <div className="rounded-xl border border-honeydim bg-surface px-6 py-5 font-mono text-[11px]">
+    <div className="rounded-xl border border-line bg-surface px-6 py-5 font-mono text-[11px]">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-display text-sm font-semibold text-honey">Mic diagnostics</h2>
+        <h2 className="font-display text-sm font-semibold text-ember">Mic diagnostics</h2>
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-raised px-3 py-1.5 text-[11px] text-cream transition-colors hover:border-honeydim"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-raised px-3 py-1.5 text-[11px] text-chalk transition-colors hover:border-chalk"
         >
           <ClipboardCopy size={13} /> {copied ? "copied" : "copy log"}
         </button>
       </div>
 
       <p className="mb-3 text-muted">
-        target <span className="text-cream">{target || "(none)"}</span> · heard{" "}
-        <span className="text-cream">{heard || "(nothing)"}</span>
+        target <span className="text-chalk">{target || "(none)"}</span> · heard{" "}
+        <span className="text-chalk">{heard || "(nothing)"}</span>
       </p>
 
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all text-cream">
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all text-chalk">
         {log.length ? log.join("\n") : "(nothing yet — press the mic and spell a word)"}
       </pre>
     </div>

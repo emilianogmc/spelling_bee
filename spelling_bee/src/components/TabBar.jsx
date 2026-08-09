@@ -15,7 +15,7 @@ export default function TabBar({ active, onChange }) {
     <nav
       aria-label="Sections"
       style={{ zIndex: "var(--z-nav)" }}
-      className="fixed inset-x-0 bottom-0 border-t border-line bg-surface/95 backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-0 border-t border-line/50 bg-surface/95 backdrop-blur-sm"
     >
       <ul className="mx-auto flex max-w-[560px]">
         {TABS.map(({ id, label, Icon }) => {
@@ -27,7 +27,7 @@ export default function TabBar({ active, onChange }) {
                 onClick={() => onChange(id)}
                 aria-current={current ? "page" : undefined}
                 className={`flex min-h-[56px] w-full flex-col items-center justify-center gap-1 pt-2 text-[11px] font-medium transition-colors ${
-                  current ? "text-honey" : "text-muted hover:text-cream"
+                  current ? "text-ember" : "text-muted hover:text-chalk"
                 }`}
                 style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }}
               >

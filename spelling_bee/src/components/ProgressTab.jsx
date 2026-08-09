@@ -9,11 +9,11 @@ const POOLS = [
 ];
 
 const DOT = {
-  all: "bg-cream",
-  hard: "bg-miss",
-  learning: "bg-honey",
-  new: "bg-line",
-  mastered: "bg-ok",
+  all: "bg-chalk",
+  hard: "bg-ember",
+  learning: "bg-muted",
+  new: "bg-stone",
+  mastered: "bg-moss",
 };
 
 export default function ProgressTab({ words, progress, current, counts, filter, onPick }) {
@@ -37,10 +37,11 @@ export default function ProgressTab({ words, progress, current, counts, filter, 
                   onClick={() => onPick(id)}
                   disabled={empty}
                   aria-current={active ? "true" : undefined}
-                  className={`flex min-h-[60px] w-full items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                    active
-                      ? "border-honey bg-raised"
-                      : "border-line bg-surface hover:border-honeydim"
+                  /* Selection is carried by the border, not by a darker fill:
+                     on `raised` the 13px hint drops to 3.6:1. Same ground for
+                     both states keeps every row's text at 5.8:1 or better. */
+                  className={`flex min-h-[60px] w-full items-center gap-3.5 rounded-xl border-2 bg-surface px-4 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
+                    active ? "border-ember" : "border-line hover:border-chalk"
                   }`}
                 >
                   <span
@@ -48,11 +49,11 @@ export default function ProgressTab({ words, progress, current, counts, filter, 
                     className={`h-3 w-3 shrink-0 rounded-full ${DOT[id]}`}
                   />
                   <span className="flex-1">
-                    <span className="block text-[15px] font-medium text-cream">{label}</span>
+                    <span className="block text-[15px] font-medium text-chalk">{label}</span>
                     <span className="block text-[13px] text-muted">{hint}</span>
                   </span>
                   <span
-                    className={`font-mono text-lg ${active ? "text-honey" : "text-muted"}`}
+                    className={`font-mono text-lg ${active ? "text-chalk" : "text-muted"}`}
                   >
                     {count}
                   </span>

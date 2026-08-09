@@ -1,73 +1,42 @@
-import { Check, CircleAlert, X } from "lucide-react";
-
-function spaced(word) {
-  return word.toUpperCase().split("").join("-");
-}
-
-const TONE = {
-  correct: { border: "border-ok", bg: "bg-okdim", text: "text-ok", Icon: Check },
-  wrong: { border: "border-miss", bg: "bg-missdim", text: "text-miss", Icon: X },
-  unclear: { border: "border-honeydim", bg: "bg-raised", text: "text-honey", Icon: CircleAlert },
-};
-
-function body(feedback) {
-  if (feedback.kind === "correct") {
-    return feedback.mastered ? "Mastered." : `Right. ${feedback.streak} of 3 in a row.`;
-  }
-  if (feedback.kind === "wrong") {
-    return (
-      <>
-        Not quite. It's <b className="letters font-medium">{spaced(feedback.word)}</b>
-      </>
-    );
-  }
-  if (feedback.kind === "truncated") {
-    return (
-      <>
-        Only caught <b className="letters font-medium">{spaced(feedback.heard)}</b>. Not scored,
-        so spell it again and hold the last letter a beat longer.
-      </>
-    );
-  }
-  return (
-    <>
-      Didn't catch that clearly, heard <b className="letters font-medium">{spaced(feedback.heard)}</b>
-      . Not scored. Try "papa" for P, "bravo" for B.
-    </>
-  );
-}
+import { Check, X } from "lucide-react";
+import { spaced } from "../lib/letters.js";
 
 /**
- * The verdict sits where the action button was, so the eye is already there.
- * Sized and coloured to be read across a room without reading the words.
+ * The verdict takes the stage the letters were on, rather than sliding in over
+ * the controls. The speller is already looking here, the primary button below
+ * it never moves, and nothing has to be hidden to keep the two from colliding.
+ *
+ * Right is moss, wrong is chalk. Neither is red: vermilion is the primary
+ * action's colour, a miss is information rather than a penalty, and moss
+ * against chalk stays distinguishable under every kind of colour blindness,
+ * which the usual red/green pair does not. Both are light blocks on a dark
+ * page, so the verdict is the loudest thing on screen either way.
  */
-export default function VerdictSheet({ feedback, onContinue }) {
-  if (!feedback) return null;
-
-  const tone = TONE[feedback.kind] ?? TONE.unclear;
-  const { Icon } = tone;
-  const scored = feedback.kind === "correct" || feedback.kind === "wrong";
+export default function Verdict({ feedback }) {
+  const correct = feedback.kind === "correct";
+  const Icon = correct ? Check : X;
 
   return (
     <div
-      role="status"
-      aria-live="assertive"
-      style={{ zIndex: "var(--z-sheet)" }}
-      className="sheet-rise fixed inset-x-0 bottom-[56px] border-t-2 border-b border-line px-4 pt-4 pb-5"
+      role="alert"
+      className={`stage-in flex w-full flex-col items-center gap-4 rounded-2xl px-5 py-8 text-night ${
+        correct ? "bg-moss" : "bg-chalk"
+      }`}
     >
-      <div
-        className={`mx-auto flex max-w-[560px] items-center gap-3.5 rounded-xl border ${tone.border} ${tone.bg} px-4 py-3.5`}
-      >
-        <Icon size={26} strokeWidth={2.5} className={`shrink-0 ${tone.text}`} aria-hidden="true" />
-        <p className={`flex-1 text-[15px] leading-snug ${tone.text}`}>{body(feedback)}</p>
-        <button
-          type="button"
-          onClick={onContinue}
-          className="min-h-[44px] shrink-0 rounded-lg border border-honey bg-honey px-4 text-sm font-semibold text-[#241a08] transition-colors hover:bg-[#f0b64f]"
-        >
-          {scored ? "Next" : "Retry"}
-        </button>
-      </div>
+      <Icon size={40} strokeWidth={2.5} aria-hidden="true" />
+
+      {correct ? (
+        <p className="text-center text-xl font-semibold">
+          {feedback.mastered ? "Mastered." : `Right. ${feedback.streak} of 3 in a row.`}
+        </p>
+      ) : (
+        <div className="flex flex-col items-center gap-2.5">
+          <p className="text-lg">Not quite. It's</p>
+          <p className="letters text-center text-[clamp(1.25rem,6vw,1.75rem)] font-medium break-all">
+            {spaced(feedback.word)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,6 @@ import ProgressTab from "./components/ProgressTab.jsx";
 import SttDebug from "./components/SttDebug.jsx";
 import TabBar, { TABS } from "./components/TabBar.jsx";
 import TtsDebug from "./components/TtsDebug.jsx";
-import VerdictSheet from "./components/VerdictSheet.jsx";
 import WordsTab from "./components/WordsTab.jsx";
 import { useDrill } from "./hooks/useDrill.js";
 import { useSpeechSynth } from "./hooks/useSpeechSynth.js";
@@ -60,10 +59,12 @@ export default function App() {
     snapshot: ttsSnapshot,
   } = useSpeechSynth();
 
-  // say() and armMic() are defined below the recognition hook but are needed by
-  // its callbacks, so they are reached through refs.
+  // say(), armMic() and the recogniser's own reset() are all defined below the
+  // recognition hook but are needed by its callbacks, so they are reached
+  // through refs.
   const sayRef = useRef(null);
   const armMicRef = useRef(null);
+  const resetMicRef = useRef(null);
   const armTimerRef = useRef(null);
   // Chrome refuses — and can wedge on — speech queued before the first
   // interaction, so the word is not read aloud until the page has been touched.
@@ -89,9 +90,18 @@ export default function App() {
   const handleVoiceResult = useCallback(
     (letters) => {
       if (!letters) return;
-      setAnswer(letters);
       // A mic mix-up holds the same word, so open the mic again for another try.
-      if (submit(letters, { fromVoice: true }) === "unclear") armMicRef.current?.();
+      // Its letters deliberately never reach the input: parking a rejected
+      // reading there turns the next "Check" tap into a scored miss.
+      if (submit(letters, { fromVoice: true }) === "unclear") {
+        // Wipe the rejected letters first. They are what the retry message is
+        // about, so leaving them on screen would suppress it — and on iOS,
+        // where nothing re-arms the mic to clear them, suppress it for good.
+        resetMicRef.current?.();
+        armMicRef.current?.();
+        return;
+      }
+      setAnswer(letters);
     },
     [submit]
   );
@@ -150,7 +160,8 @@ export default function App() {
   useEffect(() => {
     armMicRef.current = armMic;
     sayRef.current = say;
-  }, [armMic, say]);
+    resetMicRef.current = resetMic;
+  }, [armMic, resetMic, say]);
 
   useEffect(() => clearArmTimer, [clearArmTimer]);
 
@@ -165,11 +176,25 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
+  // The effect above runs before the page has been touched, so the very first
+  // word is skipped and nothing else would ever go back for it: the drill sat
+  // silent until the speller pressed something. Say it the moment the gate
+  // opens instead.
+  useEffect(() => {
+    if (interacted) sayRef.current?.(current);
+    // Only the unlock matters here; a new word is the other effect's job.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interacted]);
+
   const handleSubmit = useCallback(() => {
     if (!answer.trim()) {
       say(current);
       return;
     }
+    // The voice path closes the mic on its way to a result; a typed answer
+    // never did, so the mic stayed open through the verdict and carried on
+    // transcribing the room.
+    resetMicRef.current?.();
     submit(answer);
   }, [answer, current, say, submit]);
 
@@ -220,17 +245,22 @@ export default function App() {
     : "Voice input needs Chrome, Edge, or Safari.";
 
   const streak = current ? progress[current]?.streak ?? 0 : 0;
-  const verdictOpen = tab === "practice" && Boolean(feedback);
 
   return (
-    <div className="min-h-screen pb-[92px]">
-      <header className="mx-auto w-full max-w-[560px] px-4 pt-7 pb-5">
-        <h1 className="font-display text-2xl font-semibold">
-          {TABS.find((t) => t.id === tab)?.label}
-        </h1>
-      </header>
+    <div className="flex min-h-[100dvh] flex-col pb-[72px]">
+      {/* The drill's own screen carries no title bar: the tab bar already names
+          it, and that space is the scarcest thing on a phone. */}
+      {tab === "practice" ? (
+        <h1 className="sr-only">Practice</h1>
+      ) : (
+        <header className="mx-auto w-full max-w-[560px] px-4 pt-7 pb-5">
+          <h1 className="font-display text-2xl font-semibold">
+            {TABS.find((t) => t.id === tab)?.label}
+          </h1>
+        </header>
+      )}
 
-      <main className="mx-auto w-full max-w-[560px] px-4">
+      <main className="mx-auto flex w-full max-w-[560px] flex-1 flex-col px-4 pt-5">
         {tab === "practice" && (
           <PracticeTab
             filter={filter}
@@ -240,7 +270,7 @@ export default function App() {
             answer={answer}
             onAnswerChange={setAnswer}
             onSubmit={handleSubmit}
-            onSkip={advance}
+            onAdvance={advance}
             onSpeak={() => say(current)}
             onSpellOut={spellAloud}
             onToggleMic={toggleMic}
@@ -253,7 +283,7 @@ export default function App() {
             micError={micError}
             restartUsed={restartUsed}
             ttsError={ttsError}
-            verdictOpen={verdictOpen}
+            feedback={feedback}
           />
         )}
 
@@ -289,8 +319,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {verdictOpen && <VerdictSheet feedback={feedback} onContinue={advance} />}
 
       <TabBar active={tab} onChange={setTab} />
     </div>

@@ -3,10 +3,10 @@ import { statusOf } from "../lib/progress.js";
 const PER_ROW = 9;
 
 const TONE = {
-  new: "bg-line",
-  learning: "bg-honey",
-  hard: "bg-miss",
-  mastered: "bg-ok",
+  new: "bg-stone",
+  learning: "bg-muted",
+  hard: "bg-ember",
+  mastered: "bg-moss",
 };
 
 const LEGEND = [
@@ -35,7 +35,7 @@ export default function ProgressComb({ words, progress, current }) {
                 key={word}
                 title={word}
                 className={`hex m-[1.5px] h-[19px] w-[17px] ${TONE[statusOf(word, progress)]} ${
-                  word === current ? "outline outline-2 outline-offset-1 outline-cream" : ""
+                  word === current ? "outline outline-2 outline-offset-1 outline-chalk" : ""
                 }`}
               />
             ))}
