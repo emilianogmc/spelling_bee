@@ -224,6 +224,8 @@ export default function WordsTab({
           </button>
         )}
       </section>
+
+      <p className="pb-2 text-center text-[12px] text-dim">Built by DarwinGMC · MSW</p>
     </div>
   );
 }
