@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   CELL_H,
   CLUSTER_SIDE,
+  LATTICE,
   capacity,
   combLayout,
   hexRows,
@@ -106,6 +107,79 @@ test("the comb places every word exactly once", () => {
       Array.from({ length: count }, (_, i) => i),
       `count ${count}`
     );
+  }
+});
+
+test("the cluster lattice tiles the plane exactly", () => {
+  // The property the whole interlock rests on: repeat one cluster across the
+  // lattice and every cell is claimed once. A wrong lattice vector either
+  // overlaps clusters or leaves holes between them, and both look like a bug
+  // long before anyone works out which.
+  const base = [];
+  for (let q = -CLUSTER_SIDE; q <= CLUSTER_SIDE; q++) {
+    for (let r = -CLUSTER_SIDE; r <= CLUSTER_SIDE; r++) {
+      if ((Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2 <= CLUSTER_SIDE - 1) base.push([q, r]);
+    }
+  }
+  assert.equal(base.length, capacity(CLUSTER_SIDE));
+  assert.equal(
+    LATTICE[0][0] * LATTICE[1][1] - LATTICE[0][1] * LATTICE[1][0],
+    capacity(CLUSTER_SIDE),
+    "lattice determinant must equal the cells per cluster"
+  );
+
+  const claims = new Map();
+  for (let m = -6; m <= 6; m++) {
+    for (let n = -6; n <= 6; n++) {
+      const cq = m * LATTICE[0][0] + n * LATTICE[1][0];
+      const cr = m * LATTICE[0][1] + n * LATTICE[1][1];
+      for (const [q, r] of base) {
+        const key = `${cq + q},${cr + r}`;
+        claims.set(key, (claims.get(key) ?? 0) + 1);
+      }
+    }
+  }
+  // Judge only well inside the sampled patch, away from its ragged edge.
+  for (let q = -10; q <= 10; q++) {
+    for (let r = -10; r <= 10; r++) {
+      if ((Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2 > 8) continue;
+      assert.equal(claims.get(`${q},${r}`) ?? 0, 1, `cell ${q},${r}`);
+    }
+  }
+});
+
+test("every cluster touches another, so the comb is one connected piece", () => {
+  // Islands were the complaint: clusters have to share a wall, not float.
+  for (const count of COUNTS.filter((n) => n > capacity(CLUSTER_SIDE))) {
+    const { cells } = combLayout(count);
+    const per = capacity(CLUSTER_SIDE);
+    const groups = new Map();
+    for (const cell of cells) {
+      const c = Math.floor(cell.index / per);
+      if (!groups.has(c)) groups.set(c, []);
+      groups.get(c).push(cell);
+    }
+
+    // Cells one apart are neighbours; across a seam they sit a seam further.
+    // Anything beyond that means the two clusters are not adjacent at all.
+    const REACH = 1.35;
+    const ids = [...groups.keys()];
+    const seen = new Set([ids[0]]);
+    const queue = [ids[0]];
+    while (queue.length) {
+      const a = queue.pop();
+      for (const b of ids) {
+        if (seen.has(b)) continue;
+        const touching = groups
+          .get(a)
+          .some((p) => groups.get(b).some((q) => Math.hypot(p.x - q.x, p.y - q.y) < REACH));
+        if (touching) {
+          seen.add(b);
+          queue.push(b);
+        }
+      }
+    }
+    assert.equal(seen.size, ids.length, `count ${count}: ${ids.length - seen.size} adrift`);
   }
 });
 
