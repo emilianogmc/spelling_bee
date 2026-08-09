@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { capacity, hexRows, layout, ring, sideFor } from "./comb.js";
+import {
+  CELL_H,
+  CLUSTER_SIDE,
+  capacity,
+  combLayout,
+  hexRows,
+  orderedCells,
+  ring,
+  sideFor,
+} from "./comb.js";
 
 const SIDES = [1, 2, 3, 4, 5, 6, 8, 12];
+const COUNTS = [1, 2, 7, 19, 20, 38, 61, 62, 89, 133, 162, 169, 300];
 
 test("row lengths add up to the hexagon's capacity", () => {
   for (const side of SIDES) {
@@ -17,9 +27,9 @@ test("row lengths add up to the hexagon's capacity", () => {
 });
 
 test("consecutive rows differ by exactly one cell", () => {
-  // This is what makes centring each row enough to interlock the honeycomb:
-  // a row of k lands in the notches of the row of k+1. Any other step would
-  // need an explicit half-cell offset.
+  // Why centring a row is enough to interlock it with its neighbours: a row of
+  // k lands in the notches of the row of k+1. Any other step would need an
+  // explicit half-cell offset.
   for (const side of SIDES.filter((s) => s > 1)) {
     const rows = hexRows(side);
     for (let i = 1; i < rows.length; i++) {
@@ -44,34 +54,105 @@ test("every cell lands in a real ring, and ring r holds 6r cells", () => {
   }
 });
 
-test("the smallest hexagon that fits is never too small, and never a size too big", () => {
-  for (const count of [1, 2, 7, 8, 19, 20, 61, 62, 89, 162, 169, 170]) {
+test("fill order visits every cell once, centre first, rings outward", () => {
+  for (const side of SIDES) {
+    const cells = orderedCells(side);
+    assert.equal(cells.length, capacity(side), `side ${side}`);
+    assert.equal(new Set(cells.map((c) => `${c.row},${c.col}`)).size, capacity(side));
+    assert.equal(cells[0].r, 0);
+    for (let i = 1; i < cells.length; i++) {
+      assert.ok(cells[i].r >= cells[i - 1].r, `side ${side} went back inwards at ${i}`);
+    }
+  }
+});
+
+test("a part-full ring stays in one contiguous piece", () => {
+  // What stops a cluster being stranded away from the rest. Every cell of a
+  // part-full ring must touch the one picked before it, at any fill level.
+  const side = 4;
+  const ringCells = orderedCells(side).filter((c) => c.r === side - 1);
+  const rows = hexRows(side);
+  const centre = (c) => [
+    c.col - (rows[c.row] - 1) / 2,
+    (c.row - (side - 1)) * (2 / Math.sqrt(3)) * 0.75,
+  ];
+
+  for (let i = 1; i < ringCells.length; i++) {
+    const [ax, ay] = centre(ringCells[i]);
+    const nearest = Math.min(
+      ...ringCells.slice(0, i).map((prev) => {
+        const [bx, by] = centre(prev);
+        return Math.hypot(ax - bx, ay - by);
+      })
+    );
+    assert.ok(nearest < 1.01, `pick ${i} landed ${nearest.toFixed(2)} from anything before it`);
+  }
+});
+
+test("the smallest hexagon that fits is never too small, nor a size too big", () => {
+  for (const count of COUNTS) {
     const side = sideFor(count);
     assert.ok(capacity(side) >= count, `${count} does not fit side ${side}`);
     assert.ok(side === 1 || capacity(side - 1) < count, `${count} would fit side ${side - 1}`);
   }
 });
 
-test("words fill from the centre out, so spare cells are all on the outer ring", () => {
-  const words = Array.from({ length: 62 }, (_, i) => `w${i}`);
-  const side = sideFor(words.length); // 6 — a 91-cell hexagon
-  const placed = layout(words, side);
-
-  assert.equal(placed.size, words.length);
-  assert.equal(placed.get(`${side - 1},${side - 1}`), "w0"); // centre cell first
-
-  // 62 words fill rings 0-4 completely (61 cells) and one cell of ring 5.
-  const rings = [...placed.keys()].map((key) => {
-    const [row, col] = key.split(",").map(Number);
-    return ring(side, row, col);
-  });
-  assert.equal(rings.filter((r) => r < 5).length, 61);
-  assert.equal(rings.filter((r) => r === 5).length, 1);
+test("the comb places every word exactly once", () => {
+  for (const count of COUNTS) {
+    const { cells } = combLayout(count);
+    assert.equal(cells.length, count, `count ${count}`);
+    assert.deepEqual(
+      cells.map((c) => c.index).sort((a, b) => a - b),
+      Array.from({ length: count }, (_, i) => i),
+      `count ${count}`
+    );
+  }
 });
 
-test("an exact hexagonal count leaves no cell empty", () => {
-  const words = Array.from({ length: 61 }, (_, i) => `w${i}`);
-  const side = sideFor(words.length);
-  assert.equal(capacity(side), 61);
-  assert.equal(layout(words, side).size, 61);
+test("no two cells overlap, at any word count", () => {
+  // The property that catches a wrong pitch between clusters: cells are one
+  // width apart inside a cluster and further apart across the mortar, so any
+  // pair closer than a full width means two clusters have collided.
+  for (const count of COUNTS) {
+    const { cells } = combLayout(count);
+    let closest = Infinity;
+    for (let i = 0; i < cells.length; i++) {
+      for (let j = i + 1; j < cells.length; j++) {
+        const dx = cells[i].x - cells[j].x;
+        const dy = cells[i].y - cells[j].y;
+        closest = Math.min(closest, Math.hypot(dx, dy));
+      }
+    }
+    if (count > 1) assert.ok(closest > 0.999, `count ${count}: cells ${closest} apart`);
+  }
+});
+
+test("clusters are whole hexagons until the last one", () => {
+  // 162 words is the default list: eight full clusters of 19 and one holding
+  // the remaining ten, rather than a foreign shape tacked on the end.
+  const per = capacity(CLUSTER_SIDE);
+  assert.equal(per, 19);
+
+  const { cells } = combLayout(162);
+  const perCluster = new Map();
+  for (const cell of cells) {
+    const c = Math.floor(cell.index / per);
+    perCluster.set(c, (perCluster.get(c) ?? 0) + 1);
+  }
+  assert.equal(perCluster.size, 9);
+  for (const [c, n] of perCluster) assert.equal(n, c < 8 ? 19 : 10, `cluster ${c}`);
+});
+
+test("the bounding box holds every cell with exactly half a cell to spare", () => {
+  for (const count of COUNTS) {
+    const { cells, width, height } = combLayout(count);
+    assert.ok(width > 0 && height > 0, `count ${count}`);
+    for (const { x, y } of cells) {
+      assert.ok(x >= 0.5 - 1e-9 && x <= width - 0.5 + 1e-9, `count ${count}: x ${x} of ${width}`);
+      assert.ok(
+        y >= CELL_H / 2 - 1e-9 && y <= height - CELL_H / 2 + 1e-9,
+        `count ${count}: y ${y} of ${height}`
+      );
+    }
+  }
 });
