@@ -8,12 +8,13 @@ const POOLS = [
   { id: "mastered", label: "Mastered", hint: "Three in a row" },
 ];
 
+/** Matches the comb exactly, so the two read as one system. */
 const DOT = {
-  all: "bg-chalk",
+  all: "bg-cream",
   hard: "bg-ember",
-  learning: "bg-muted",
-  new: "bg-stone",
-  mastered: "bg-moss",
+  learning: "bg-honey",
+  new: "bg-hover",
+  mastered: "bg-honeypale",
 };
 
 export default function ProgressTab({ words, progress, current, counts, filter, onPick }) {
@@ -21,7 +22,7 @@ export default function ProgressTab({ words, progress, current, counts, filter, 
     <div className="flex flex-col gap-8">
       <section>
         <h2 className="mb-1 font-display text-xl font-semibold">What to drill</h2>
-        <p className="mb-4 text-[14px] text-muted">
+        <p className="mb-4 text-[14px] text-sage">
           Pick a set and practice starts on it.
         </p>
 
@@ -41,7 +42,7 @@ export default function ProgressTab({ words, progress, current, counts, filter, 
                      on `raised` the 13px hint drops to 3.6:1. Same ground for
                      both states keeps every row's text at 5.8:1 or better. */
                   className={`flex min-h-[60px] w-full items-center gap-3.5 rounded-xl border-2 bg-surface px-4 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
-                    active ? "border-ember" : "border-line hover:border-chalk"
+                    active ? "border-honey" : "border-dim hover:border-cream"
                   }`}
                 >
                   <span
@@ -49,11 +50,11 @@ export default function ProgressTab({ words, progress, current, counts, filter, 
                     className={`h-3 w-3 shrink-0 rounded-full ${DOT[id]}`}
                   />
                   <span className="flex-1">
-                    <span className="block text-[15px] font-medium text-chalk">{label}</span>
-                    <span className="block text-[13px] text-muted">{hint}</span>
+                    <span className="block text-[15px] font-medium text-cream">{label}</span>
+                    <span className="block text-[13px] text-sage">{hint}</span>
                   </span>
                   <span
-                    className={`font-mono text-lg ${active ? "text-chalk" : "text-muted"}`}
+                    className={`font-mono text-lg ${active ? "text-cream" : "text-sage"}`}
                   >
                     {count}
                   </span>
@@ -66,7 +67,7 @@ export default function ProgressTab({ words, progress, current, counts, filter, 
 
       <section>
         <h2 className="mb-1 font-display text-xl font-semibold">The comb</h2>
-        <p className="mb-4 text-[14px] text-muted">
+        <p className="mb-4 text-[14px] text-sage">
           One cell per word. The outlined cell is the word in play.
         </p>
         <ProgressComb words={words} progress={progress} current={current} />

@@ -26,21 +26,21 @@ export default function TtsDebug({ snapshot, log, error }) {
 
   return (
     <div className="rounded-xl border border-line bg-surface px-6 py-5 font-mono text-[11px]">
-      <h2 className="mb-3 font-display text-sm font-semibold text-ember">
+      <h2 className="mb-3 font-display text-sm font-semibold text-honey">
         TTS diagnostics
       </h2>
 
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
-            <dt className="text-muted">{label}</dt>
-            <dd className="break-all text-chalk">{value}</dd>
+            <dt className="text-sage">{label}</dt>
+            <dd className="break-all text-cream">{value}</dd>
           </div>
         ))}
       </dl>
 
-      <p className="mt-4 mb-1 text-muted">event log</p>
-      <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-all text-chalk">
+      <p className="mt-4 mb-1 text-sage">event log</p>
+      <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-all text-cream">
         {log.length ? log.join("\n") : "(nothing yet — press the speaker)"}
       </pre>
     </div>

@@ -29,15 +29,20 @@ default.
 
 ## Brand Personality
 
-Focused, warm, unfussy. The identity is warm charcoal and vermilion: it reads
-as a study lamp at night rather than a game. Feedback is plain and immediate,
-never congratulatory theatre and never scolding. A miss is information, not a
+Focused, warm, unfussy. The identity is warm charcoal and honey: it reads as a
+study lamp at night rather than a game. Feedback is plain and immediate, never
+congratulatory theatre and never scolding. A miss is information, not a
 penalty.
 
-Vermilion belongs to the drill's one primary action and to live state. It is
-never a verdict, so right and wrong are moss and chalk instead of green and
-red: both stay distinguishable under every kind of colour blindness, and
-neither reads as a scolding.
+Three accents, one meaning each, and they never trade jobs. **Honey** is the
+identity: the primary action, progress, and anything currently selected.
+**Vermilion** is live state and trouble, kept rare so it still means
+something: the mic being open, an error, a word that keeps failing.
+**Olive** marks a correct answer and nothing else.
+
+So right and wrong are olive and cream rather than green and red. Neither
+reads as a scolding, both stay distinguishable under every kind of colour
+blindness, and vermilion is left free to mean "look here".
 
 Voice: short, literal, second person. "Not quite. It's P-R-O-F-L-I-G-A-T-E."
 Never "Oops!", never exclamation marks, never streak-shaming.

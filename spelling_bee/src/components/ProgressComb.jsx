@@ -1,11 +1,27 @@
 import { CELL_H, combLayout } from "../lib/comb.js";
 import { statusOf } from "../lib/progress.js";
 
+/**
+ * Untested, learning and mastered are one progression, so they get one hue and
+ * climb it: an unlit cell, then honey, then pale honey. The comb fills with
+ * honey as the list is learned, which is both what the data is and what the
+ * thing is a picture of.
+ *
+ * Hard is not a step on that progression. It is the state the whole tab exists
+ * to surface, and the only one worth scanning a hundred and sixty cells for,
+ * so it keeps the one hue break. Olive left the comb; it still marks a correct
+ * answer on the verdict, where green is doing semantic work rather than
+ * competing for attention in a field.
+ *
+ * Luminances run 0.11 / 0.44 / 0.65 for the ramp against 0.26 for ember, so
+ * the states stay apart by lightness alone and survive colour blindness. The
+ * pool list above gives every count in words besides.
+ */
 const TONE = {
-  new: "bg-stone",
-  learning: "bg-muted",
+  new: "bg-hover",
+  learning: "bg-honey",
   hard: "bg-ember",
-  mastered: "bg-moss",
+  mastered: "bg-honeypale",
 };
 
 const LEGEND = [
@@ -60,7 +76,7 @@ export default function ProgressComb({ words, progress, current }) {
                   an outline on a clip-path element gets clipped away with
                   everything else outside the shape. */}
               <div
-                className={`hex h-full w-full ${word === current ? "bg-chalk p-[2px]" : ""}`}
+                className={`hex h-full w-full ${word === current ? "bg-cream p-[2px]" : ""}`}
               >
                 <div
                   className={`hex h-full w-full transition-colors ${
@@ -73,9 +89,9 @@ export default function ProgressComb({ words, progress, current }) {
         })}
       </div>
 
-      <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-line/40 pt-4">
+      <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-line pt-4">
         {LEGEND.map(({ key, label }) => (
-          <span key={key} className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span key={key} className="flex items-center gap-1.5 text-[11px] text-sage">
             <i className={`hex inline-block h-3 w-[10.4px] ${TONE[key]}`} aria-hidden="true" />
             {label}
           </span>

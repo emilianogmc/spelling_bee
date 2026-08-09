@@ -29,14 +29,14 @@ export default function WordsTab({
     <div className="flex flex-col gap-8">
       <section>
         <h2 className="mb-1 font-display text-xl font-semibold">Voice</h2>
-        <p className="mb-4 text-[14px] text-muted">How the word is read, and when the mic opens.</p>
+        <p className="mb-4 text-[14px] text-sage">How the word is read, and when the mic opens.</p>
 
         <div className="rounded-xl border border-line bg-surface px-4 py-4">
-          <label htmlFor="rate" className="block text-[15px] font-medium text-chalk">
+          <label htmlFor="rate" className="block text-[15px] font-medium text-cream">
             Reading speed
           </label>
           <div className="mt-3 flex items-center gap-3">
-            <span className="text-[13px] text-muted">Slow</span>
+            <span className="text-[13px] text-sage">Slow</span>
             <input
               id="rate"
               type="range"
@@ -47,7 +47,7 @@ export default function WordsTab({
               onChange={(event) => onRateChange(Number(event.target.value))}
               className="h-11 min-w-0 flex-1"
             />
-            <span className="text-[13px] text-muted">Normal</span>
+            <span className="text-[13px] text-sage">Normal</span>
           </div>
         </div>
 
@@ -61,13 +61,13 @@ export default function WordsTab({
             checked={autoMic}
             disabled={!micSupported || !autoMicCapable}
             onChange={onToggleAutoMic}
-            className="h-5 w-5 shrink-0 accent-ember"
+            className="h-5 w-5 shrink-0 accent-honey"
           />
           <span>
-            <span className="block text-[15px] font-medium text-chalk">
+            <span className="block text-[15px] font-medium text-cream">
               Open the mic automatically
             </span>
-            <span className="block text-[13px] text-muted">
+            <span className="block text-[13px] text-sage">
               {micSupported && !autoMicCapable
                 ? "Unavailable on iPhone and iPad. Safari only opens the mic from a direct tap."
                 : "Starts listening as soon as the word finishes."}
@@ -78,7 +78,7 @@ export default function WordsTab({
 
       <section>
         <h2 className="mb-1 font-display text-xl font-semibold">Word list</h2>
-        <p className="mb-4 text-[14px] text-muted">
+        <p className="mb-4 text-[14px] text-sage">
           One word per line. {words.length} in the list now.
         </p>
 
@@ -87,19 +87,19 @@ export default function WordsTab({
           spellCheck="false"
           onChange={(event) => setDraft(event.target.value)}
           aria-label="Word list, one word per line"
-          className="min-h-[220px] w-full resize-y rounded-xl border border-line bg-surface p-3.5 font-mono text-[13px] leading-relaxed text-chalk outline-none focus:border-ember"
+          className="min-h-[220px] w-full resize-y rounded-xl border border-dim bg-surface p-3.5 font-mono text-[13px] leading-relaxed text-cream outline-none focus:border-honey"
         />
 
         <button
           type="button"
           onClick={() => onSave(parsed)}
           disabled={!dirty || parsed.length === 0}
-          /* Filled ember carries its label at 3.1:1, which is large-text only,
-             so every filled button in the app is 19px bold. */
-          /* Nothing to save is a resting state, not a broken button. Dimming
-             the filled version left an unreadable slab; going neutral says
-             "already saved" and keeps the label legible. */
-          className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border-2 border-ember bg-ember text-[19px] font-bold text-chalk transition-colors hover:border-[#ff7452] hover:bg-[#ff7452] disabled:cursor-default disabled:border-line disabled:bg-transparent disabled:text-muted"
+          /* Ink on honey is 6.6:1 at any size; the label stays large because
+             this section has one obvious action, not to prop up contrast.
+             Nothing to save is a resting state rather than a broken button, so
+             it goes neutral instead of dimming the fill into an unreadable
+             slab. */
+          className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border-2 border-honey bg-honey text-[19px] font-bold text-ink transition-colors hover:border-honeypale hover:bg-honeypale disabled:cursor-default disabled:border-dim disabled:bg-transparent disabled:text-sage"
         >
           <Save size={19} aria-hidden="true" /> {dirty ? "Save word list" : "Saved"}
         </button>
@@ -107,7 +107,7 @@ export default function WordsTab({
 
       <section>
         <h2 className="mb-1 font-display text-xl font-semibold">Reset</h2>
-        <p className="mb-4 text-[14px] text-muted">
+        <p className="mb-4 text-[14px] text-sage">
           Clears every streak and mastery mark. The word list itself is kept.
         </p>
 
@@ -119,17 +119,18 @@ export default function WordsTab({
                 onReset();
                 setConfirmingReset(false);
               }}
-              /* Outlined, not filled: ember text needs the page behind it to
-                 reach 4.8:1, and a destructive action should not look like the
-                 button you press to get on with the drill. */
-              className="min-h-[52px] flex-1 rounded-xl border-2 border-ember text-[15px] font-semibold text-ember transition-colors hover:bg-ember/10"
+              /* Outlined, not filled: a destructive action should not look
+                 like the button you press to get on with the drill. The label
+                 is emberpale because ember itself is 4.1:1 on the page, which
+                 carries large text but not fifteen pixels of it. */
+              className="min-h-[52px] flex-1 rounded-xl border-2 border-ember text-[15px] font-semibold text-emberpale transition-colors hover:bg-emberdim"
             >
               Erase all progress
             </button>
             <button
               type="button"
               onClick={() => setConfirmingReset(false)}
-              className="min-h-[52px] flex-1 rounded-xl border border-line bg-surface text-[15px] text-chalk transition-colors hover:border-chalk"
+              className="min-h-[52px] flex-1 rounded-xl border border-dim bg-surface text-[15px] text-cream transition-colors hover:border-cream"
             >
               Keep it
             </button>
@@ -138,7 +139,7 @@ export default function WordsTab({
           <button
             type="button"
             onClick={() => setConfirmingReset(true)}
-            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface text-[15px] text-chalk transition-colors hover:border-chalk"
+            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dim bg-surface text-[15px] text-cream transition-colors hover:border-cream"
           >
             <RotateCcw size={17} aria-hidden="true" /> Reset progress
           </button>

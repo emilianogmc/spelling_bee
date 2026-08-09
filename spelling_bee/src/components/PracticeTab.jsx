@@ -31,7 +31,7 @@ function StreakPips({ streak }) {
           key={i}
           aria-hidden="true"
           className={`h-2.5 w-2.5 rounded-full transition-colors ${
-            i < streak ? "bg-ember" : "bg-stone"
+            i < streak ? "bg-honey" : "bg-hover"
           }`}
         />
       ))}
@@ -45,7 +45,7 @@ function Tertiary({ onClick, Icon, children }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg px-1 text-[13px] text-muted transition-colors hover:text-chalk"
+      className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg px-1 text-[13px] text-sage transition-colors hover:text-cream"
     >
       <Icon size={15} aria-hidden="true" /> {children}
     </button>
@@ -79,7 +79,7 @@ export default function PracticeTab({
 
   if (!current) {
     return (
-      <p className="mx-auto max-w-[46ch] px-2 py-16 text-center text-[15px] leading-relaxed text-muted">
+      <p className="mx-auto max-w-[46ch] px-2 py-16 text-center text-[15px] leading-relaxed text-sage">
         {EMPTY_COPY[filter] ?? EMPTY_COPY.all}
       </p>
     );
@@ -99,22 +99,22 @@ export default function PracticeTab({
     stage = <Verdict feedback={feedback} />;
   } else if (micError) {
     stage = (
-      <p role="alert" className="max-w-[34ch] text-center text-[15px] text-ember">
+      <p role="alert" className="max-w-[34ch] text-center text-[15px] text-emberpale">
         {micError}
       </p>
     );
   } else if (heard) {
     stage = (
       <div className="flex flex-col items-center gap-3">
-        <p className="letters text-center text-[clamp(1.5rem,7vw,2.125rem)] font-medium break-all text-chalk">
+        <p className="letters text-center text-[clamp(1.5rem,7vw,2.125rem)] font-medium break-all text-cream">
           {spaced(heard)}
         </p>
-        <p className="text-[13px] text-muted">{interim ? "hearing" : "heard"}</p>
+        <p className="text-[13px] text-sage">{interim ? "hearing" : "heard"}</p>
       </div>
     );
   } else if (retry) {
     stage = (
-      <p role="status" className="max-w-[34ch] text-center text-[15px] leading-relaxed text-ember">
+      <p role="status" className="max-w-[34ch] text-center text-[15px] leading-relaxed text-emberpale">
         {feedback.kind === "truncated" ? (
           <>
             Only caught <b className="letters font-medium">{spaced(feedback.heard)}</b>. Not
@@ -131,18 +131,18 @@ export default function PracticeTab({
     );
   } else if (listening) {
     stage = (
-      <p className="flex items-center gap-2.5 text-[17px] text-chalk">
+      <p className="flex items-center gap-2.5 text-[17px] text-cream">
         <span className="live-dot h-2.5 w-2.5 rounded-full bg-ember" aria-hidden="true" />
         Listening. Spell it out.
       </p>
     );
   } else if (speaking) {
-    stage = <p className="text-[17px] text-muted">Reading the word.</p>;
+    stage = <p className="text-[17px] text-sage">Reading the word.</p>;
   } else {
     // Every other stage state speaks at 17px; the idle prompt matched none of
     // them and read as leftover placeholder in all that space.
     stage = (
-      <p className="max-w-[30ch] text-center text-[17px] leading-relaxed text-muted">
+      <p className="max-w-[30ch] text-center text-[17px] leading-relaxed text-sage">
         {micSupported ? "Listen, then spell it out loud." : micHint}
       </p>
     );
@@ -165,8 +165,8 @@ export default function PracticeTab({
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-line/40 pb-3 text-[13px]">
-        <span className="text-muted">
+      <div className="flex items-center justify-between gap-3 border-b border-line pb-3 text-[13px]">
+        <span className="text-sage">
           {FILTER_LABEL[filter] ?? FILTER_LABEL.all} · {remaining} left
         </span>
         <StreakPips streak={streak} />
@@ -184,11 +184,11 @@ export default function PracticeTab({
           primary target holds its position through every state change. */}
       <div className="flex flex-col gap-3">
         {ttsError && ttsError !== "blocked-until-you-interact" && (
-          <p className="text-center text-[13px] text-ember">Speech failed: {ttsError}</p>
+          <p className="text-center text-[13px] text-emberpale">Speech failed: {ttsError}</p>
         )}
 
         {listening && !scored && !restartUsed && (
-          <p className="text-center text-[13px] text-muted">
+          <p className="text-center text-[13px] text-sage">
             Tangled? Say "may I start over" for one fresh try.
           </p>
         )}
@@ -210,7 +210,7 @@ export default function PracticeTab({
             autoCapitalize="off"
             spellCheck="false"
             aria-label="Type the spelling"
-            className="letters min-h-[56px] w-full rounded-xl border border-line bg-surface px-4 text-base text-chalk outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-muted focus:border-ember"
+            className="letters min-h-[56px] w-full rounded-xl border border-dim bg-surface px-4 text-base text-cream outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-sage focus:border-honey"
           />
         )}
 
@@ -219,10 +219,13 @@ export default function PracticeTab({
             type="button"
             onClick={onSpeak}
             aria-label="Hear the word again"
+            /* Honey while it reads the word, because that is the app working,
+               not something wrong. Ember stays reserved for the mic being open
+               and for trouble. */
             className={`flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-xl border-2 transition-colors ${
               speaking
-                ? "border-ember bg-surface text-ember"
-                : "border-line bg-surface text-chalk hover:border-ember hover:text-ember"
+                ? "border-honey bg-surface text-honey"
+                : "border-dim bg-surface text-cream hover:border-honey hover:text-honey"
             }`}
           >
             <Volume2 size={26} strokeWidth={1.9} aria-hidden="true" />
@@ -232,14 +235,16 @@ export default function PracticeTab({
             type="button"
             onClick={primary.onClick}
             disabled={primary.disabled}
-            /* 19px/700 is not styling: chalk on vermilion is 3.1:1, which WCAG
-               allows for large text only. Below 18.66px bold this button would
-               fail AA. The filled state means "press me"; the outlined state
-               means "live, press to stop". */
+            /* Honey rather than vermilion: ink on honey is 6.6:1, where cream
+               on ember is 3.1:1 and would have passed only because the label
+               is large. It stays 19px for a control pressed without looking,
+               but the size is no longer propping up the contrast. Filled means
+               "press me", outlined means "live, press to stop", and ember
+               appears only in that live state. */
             className={`flex min-h-[60px] flex-1 items-center justify-center gap-2.5 rounded-xl border-2 text-[19px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               primary.live
-                ? "border-ember bg-transparent text-ember hover:bg-ember/10"
-                : "border-ember bg-ember text-chalk hover:border-[#ff7452] hover:bg-[#ff7452]"
+                ? "border-ember bg-transparent text-emberpale hover:bg-emberdim"
+                : "border-honey bg-honey text-ink hover:border-honeypale hover:bg-honeypale"
             }`}
           >
             <primary.Icon size={20} strokeWidth={2.5} aria-hidden="true" /> {primary.label}

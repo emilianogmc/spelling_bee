@@ -6,9 +6,9 @@ import { spaced } from "../lib/letters.js";
  * the controls. The speller is already looking here, the primary button below
  * it never moves, and nothing has to be hidden to keep the two from colliding.
  *
- * Right is moss, wrong is chalk. Neither is red: vermilion is the primary
- * action's colour, a miss is information rather than a penalty, and moss
- * against chalk stays distinguishable under every kind of colour blindness,
+ * Right is olive, wrong is cream. Neither is red: vermilion belongs to the
+ * action's colour, a miss is information rather than a penalty, and olive
+ * against cream stays distinguishable under every kind of colour blindness,
  * which the usual red/green pair does not. Both are light blocks on a dark
  * page, so the verdict is the loudest thing on screen either way.
  */
@@ -19,8 +19,8 @@ export default function Verdict({ feedback }) {
   return (
     <div
       role="alert"
-      className={`stage-in flex w-full flex-col items-center gap-4 rounded-2xl px-5 py-8 text-night ${
-        correct ? "bg-moss" : "bg-chalk"
+      className={`stage-in flex w-full flex-col items-center gap-4 rounded-2xl px-5 py-8 text-ink ${
+        correct ? "bg-olive" : "bg-cream"
       }`}
     >
       <Icon size={40} strokeWidth={2.5} aria-hidden="true" />
