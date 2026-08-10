@@ -4,6 +4,7 @@ import {
   isConfusable,
   isNearMiss,
   isTruncated,
+  pickTranscript,
   splitOnRestart,
   transcriptToLetters,
 } from "./letters.js";
@@ -48,4 +49,33 @@ test("only confusable substitutions count as a near miss", () => {
   assert.equal(isNearMiss("profligate", "profligate"), false); // nothing to excuse
   assert.equal(isNearMiss("profligrte", "profligate"), false); // A and R sound nothing alike
   assert.equal(isConfusable("b", "b"), false); // a letter is not confusable with itself
+});
+
+test("a lower-ranked alternative wins when it names the letter actually due next", () => {
+  // The engine's top guess was B; P was there too, just ranked second.
+  assert.equal(pickTranscript(["bee", "pea"], "premonition", ""), "p");
+  // Same shape for T/D, later in the word.
+  assert.equal(pickTranscript(["dee", "tee"], "premonition", "premoni"), "t");
+});
+
+test("the top-ranked alternative still wins when it already matches", () => {
+  assert.equal(pickTranscript(["pea", "bee"], "premonition", ""), "p");
+});
+
+test("no alternative names the expected letter, so the top guess stands", () => {
+  // Wrong on purpose: nothing offered was ever going to be right, and
+  // that miss is the speller's, not the recogniser's.
+  assert.equal(pickTranscript(["bee", "dee"], "premonition", ""), "b");
+});
+
+test("a lower-ranked alternative can still complete the whole word", () => {
+  // Safari's run-together transcript: the top-ranked guess is mangled, but a
+  // lower-ranked alternative, read literally, spells the entire target.
+  assert.equal(pickTranscript(["broflegate", "profligate"], "profligate", ""), "profligate");
+});
+
+test("pending letters from earlier in the same event shift the expected position", () => {
+  // "pr" has already been read this event but not yet committed to the
+  // buffer; the next letter due is the third of the word, not the first.
+  assert.equal(pickTranscript(["ee", "oh"], "premonition", "", "pr"), "e");
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { splitOnRestart, transcriptToLetters } from "../lib/letters.js";
+import { pickTranscript, splitOnRestart, transcriptToLetters } from "../lib/letters.js";
 
 /**
  * Continuous letter-by-letter recognition.
@@ -232,34 +232,15 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
           continue;
         }
 
-        let best = "";
-        let matched = false;
-
-        // Safari transcribes spelled-out letters as one run-together word:
-        // "P", "PR", "PRO" … "PROFLIGATE". Once that reaches the target, the
-        // ritual rule that strips the spoken word deletes the spelling itself
-        // — so a correct answer is thrown away for being correct, and a
-        // misheard alternative ("BROFLIGATE") wins by default. Each
-        // alternative is therefore read both ways, and a reading that
-        // completes the word beats one that strips to nothing.
-        for (let j = 0; j < result.length && !matched; j++) {
-          const raw = result[j].transcript;
-
-          const stripped = transcriptToLetters(raw, goal);
-          if (!best) best = stripped;
-          if (goal && bufferRef.current + stripped === goal) {
-            best = stripped;
-            matched = true;
-            break;
-          }
-
-          const literal = transcriptToLetters(raw, "");
-          if (goal && bufferRef.current + literal === goal) {
-            best = literal;
-            matched = true;
-            break;
-          }
-        }
+        // Read every alternative the recogniser offers for this chunk, not
+        // just its top guess: see pickTranscript for why. Safari's
+        // run-together transcript ("P", "PR", "PRO" … "PROFLIGATE") is part
+        // of the same pass — a reading that completes the whole word beats
+        // one that strips to nothing, which is why alternatives are read
+        // against the target and read literally both.
+        const alts = [];
+        for (let j = 0; j < result.length; j++) alts.push(result[j].transcript);
+        const best = pickTranscript(alts, goal, bufferRef.current, pending);
 
         if (result.isFinal) bufferRef.current += best;
         else pending += best;

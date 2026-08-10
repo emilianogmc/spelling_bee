@@ -184,3 +184,42 @@ export function transcriptToLetters(raw, target = "") {
 
   return out.join("");
 }
+
+/**
+ * Chooses which of the recogniser's alternative transcripts for one chunk to
+ * trust, instead of always taking its top-ranked guess.
+ *
+ * Voiced/voiceless pairs — P/B, T/D, K/G, F/V, S/Z — differ by a few
+ * milliseconds of voice onset that this recogniser guesses wrong often
+ * enough to make the drill unusable, but its own alternative list usually
+ * contains the right letter anyway, just not ranked first: the engine heard
+ * the ambiguity, it just resolved it the wrong way. The target word is the
+ * one piece of information the engine doesn't have, so an alternative that
+ * names the letter actually due next is preferred over the engine's own
+ * ranking, short of a whole-word match (Safari's run-together transcript),
+ * which always wins outright.
+ *
+ * `alternatives` is raw transcript strings, ranked by the engine's own
+ * confidence. `buffer` is what has already been committed to the answer;
+ * `pending` is what this same recognition event has already added but not
+ * yet committed, used only to find the position of the next expected
+ * letter — the whole-word check stays keyed to `buffer` alone, matching
+ * what the recogniser actually completes.
+ */
+export function pickTranscript(alternatives, goal, buffer, pending = "") {
+  const expected = goal ? goal[buffer.length + pending.length] : undefined;
+  let best = "";
+
+  for (const raw of alternatives) {
+    const stripped = transcriptToLetters(raw, goal);
+    if (!best) best = stripped;
+    if (goal && buffer + stripped === goal) return stripped;
+
+    const literal = transcriptToLetters(raw, "");
+    if (goal && buffer + literal === goal) return literal;
+
+    if (expected && stripped === expected) return stripped;
+  }
+
+  return best;
+}
