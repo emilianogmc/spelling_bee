@@ -7,7 +7,8 @@ https://spellingdrills.pages.dev
 - text to speech
 - speech to letters
 - NATO alphabet
-- progress tracking system
+- progress tracker
+- dictionary definitions
 
 ## History
 
@@ -25,6 +26,10 @@ With only four days, I used Claude Code to generate the code while I orchestrate
 
 ### Outcome
 
-The outcome was a web app that had the tools any speller would need: text to speech, speech to letters, NATO alphabet, and a progress tracking system.
+It has the tools any speller would need: text to speech, speech to letters, NATO alphabet, progress tracker, and dictionary definitions.
 
 After two days of development, I drilled with it from August 9 to 10, providing me with a better knowledge of the words. On August 11th I won first place in the Spelling Bee Competition.
+
+## License
+
+[MIT](LICENSE)
