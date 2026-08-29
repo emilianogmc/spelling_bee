@@ -1,0 +1,30 @@
+# spelling.help
+
+spelling.help is a web app to practice spelling for a competition with a customizable word list.
+
+spellingdrills.pages.dev
+
+- text to speech
+- speech to letters
+- NATO alphabet
+- progress tracking system
+
+## History
+
+### Problem
+
+In my school we were told we would have a spelling bee competition on August 11th. I had a week of preparation, so I started practicing every day with the list of words the teacher handed out, memorizing all of them, but when I wanted to test my knowledge with a pronouncer, no one had time to speak all the words. I noticed a problem on August 7th:
+
+Competitors might not have a pronouncer to test their knowledge, and other apps' word lists aren't customizable or the web app isn't free.
+
+spelling.help solves all these problems.
+
+### Constraints
+
+With only four days, I used Claude Code to generate the code while I orchestrated the structure of the project.
+
+### Outcome
+
+The outcome was a web app that had the tools any speller would need: text to speech, speech to letters, NATO alphabet, and a progress tracking system.
+
+After two days of development, I drilled with it from August 9 to 10, providing me with a better knowledge of the words. On August 11th I won first place in the Spelling Bee Competition.
