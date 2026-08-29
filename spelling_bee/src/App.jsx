@@ -5,6 +5,7 @@ import SttDebug from "./components/SttDebug.jsx";
 import TabBar, { TABS } from "./components/TabBar.jsx";
 import TtsDebug from "./components/TtsDebug.jsx";
 import WordsTab from "./components/WordsTab.jsx";
+import { useDefinition } from "./hooks/useDefinition.js";
 import { useDrill } from "./hooks/useDrill.js";
 import { useSpeechSynth } from "./hooks/useSpeechSynth.js";
 import { useSpeechRecognition } from "./hooks/useSpeechRecognition.js";
@@ -49,6 +50,10 @@ export default function App() {
   const [autoMic, setAutoMic] = useState(
     () => AUTO_MIC_CAPABLE && loadStored(KEY_AUTOMIC, true) !== false
   );
+  // idle | loading | speaking | not-found | error — where a definition
+  // lookup started for `current` currently stands.
+  const [defineState, setDefineState] = useState("idle");
+  const define = useDefinition();
 
   const {
     speak,
@@ -70,6 +75,13 @@ export default function App() {
   // interaction, so the word is not read aloud until the page has been touched.
   const interactedRef = useRef(false);
   const [interacted, setInteracted] = useState(false);
+  // A definition lookup is async and the word can move on before it answers
+  // — a skip, an advance — so the callback checks this rather than trusting
+  // its own closed-over `current`.
+  const currentRef = useRef(current);
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
 
   useEffect(() => {
     if (interacted) return undefined;
@@ -146,13 +158,22 @@ export default function App() {
   }, [autoMic, clearArmTimer, micError, micSupported, start]);
 
   // One rule for everything the app says: mic off while the voice talks, mic
-  // back on the moment it stops.
+  // back on the moment it stops. A caller can still ride along on that same
+  // end — the definition's status resets that way — as long as the mic still
+  // gets the last word.
   const say = useCallback(
-    (text, options) => {
+    (text, { onEnd, ...options } = {}) => {
       clearArmTimer();
       if (!text) return;
       resetMic();
-      speak(text, { rate, ...options, onEnd: () => armMicRef.current?.() });
+      speak(text, {
+        rate,
+        ...options,
+        onEnd: () => {
+          onEnd?.();
+          armMicRef.current?.();
+        },
+      });
     },
     [clearArmTimer, rate, resetMic, speak]
   );
@@ -171,6 +192,7 @@ export default function App() {
   useEffect(() => {
     setAnswer("");
     resetMic();
+    setDefineState("idle");
     if (interactedRef.current) say(current);
     // Rate changes shouldn't re-trigger speech on their own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -230,6 +252,31 @@ export default function App() {
     say(current, { rate: 0.8, spellOut: true });
   }, [current, say]);
 
+  // Real bees answer this from the judges' own dictionary; this one asks an
+  // actual dictionary rather than shipping a second, hand-written copy of the
+  // word list that would drift the moment the Words tab edits the first one.
+  // Spoken only — there is nowhere on this screen to put a paragraph of text,
+  // and the speller's eyes are on the word, not the app.
+  const defineAloud = useCallback(async () => {
+    if (!current) return;
+    const word = current;
+    clearArmTimer();
+    resetMicRef.current?.();
+    setDefineState("loading");
+
+    const { text, status } = await define(word);
+    // The word moved on while this was in flight — a skip, an advance — so
+    // whatever answer just arrived belongs to a question nobody is asking.
+    if (word !== currentRef.current) return;
+
+    if (status !== "ok") {
+      setDefineState(status === "aborted" ? "idle" : status);
+      return;
+    }
+    setDefineState("speaking");
+    say(text, { onEnd: () => setDefineState("idle") });
+  }, [clearArmTimer, current, define, say]);
+
   // Choosing a set to drill is a practice decision, so it hands the speller
   // back to the drill rather than leaving them to find the tab themselves.
   const pickPool = useCallback(
@@ -273,6 +320,8 @@ export default function App() {
             onAdvance={advance}
             onSpeak={() => say(current)}
             onSpellOut={spellAloud}
+            onDefine={defineAloud}
+            defineState={defineState}
             onToggleMic={toggleMic}
             speaking={speaking}
             listening={listening}

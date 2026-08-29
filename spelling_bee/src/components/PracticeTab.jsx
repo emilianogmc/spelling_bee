@@ -1,8 +1,32 @@
 import { useState } from "react";
-import { Keyboard, Mic, SkipForward, SpellCheck2, Square, Volume2 } from "lucide-react";
+import {
+  BookAudio,
+  Keyboard,
+  Mic,
+  SkipForward,
+  SpellCheck2,
+  Square,
+  Volume2,
+} from "lucide-react";
 import Verdict from "./Verdict.jsx";
 import { spaced } from "../lib/letters.js";
 import { MASTERY_STREAK } from "../lib/progress.js";
+
+/** What the stage says while a definition is in flight or just landed. Kept
+    to one line, because there is nowhere on this screen for a paragraph and
+    the definition itself is heard, never read. */
+const DEFINE_STAGE = {
+  loading: { text: "Looking up the definition.", className: "text-[17px] text-sage" },
+  speaking: { text: "Reading the definition.", className: "text-[17px] text-sage" },
+  "not-found": {
+    text: "No definition on file for this word.",
+    className: "text-[15px] leading-relaxed text-sage",
+  },
+  error: {
+    text: "Couldn't reach the dictionary.",
+    className: "text-[15px] leading-relaxed text-emberpale",
+  },
+};
 
 const FILTER_LABEL = {
   all: "All words",
@@ -39,13 +63,13 @@ function StreakPips({ streak }) {
   );
 }
 
-/** Quiet text control. Everything in the row under the primary button. */
+/** Quiet text control. Everything in the grid under the primary button. */
 function Tertiary({ onClick, Icon, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg px-1 text-[13px] text-sage transition-colors hover:text-cream"
+      className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg px-1 text-[13px] text-sage transition-colors hover:text-cream"
     >
       <Icon size={15} aria-hidden="true" /> {children}
     </button>
@@ -63,6 +87,8 @@ export default function PracticeTab({
   onAdvance,
   onSpeak,
   onSpellOut,
+  onDefine,
+  defineState,
   onToggleMic,
   speaking,
   listening,
@@ -134,6 +160,13 @@ export default function PracticeTab({
       <p className="flex items-center gap-2.5 text-[17px] text-cream">
         <span className="live-dot h-2.5 w-2.5 rounded-full bg-ember" aria-hidden="true" />
         Listening. Spell it out.
+      </p>
+    );
+  } else if (DEFINE_STAGE[defineState]) {
+    const { text, className } = DEFINE_STAGE[defineState];
+    stage = (
+      <p role="status" className={`max-w-[30ch] text-center ${className}`}>
+        {text}
       </p>
     );
   } else if (speaking) {
@@ -252,7 +285,7 @@ export default function PracticeTab({
         </div>
 
         {!scored && (
-          <div className="flex gap-1">
+          <div className="grid grid-cols-2 gap-1">
             {micSupported && (
               <Tertiary onClick={() => setTyping(!typing)} Icon={typed ? Mic : Keyboard}>
                 {typed ? "Use the mic" : "Type instead"}
@@ -260,6 +293,9 @@ export default function PracticeTab({
             )}
             <Tertiary onClick={onSpellOut} Icon={SpellCheck2}>
               Spell it to me
+            </Tertiary>
+            <Tertiary onClick={onDefine} Icon={BookAudio}>
+              Define it
             </Tertiary>
             <Tertiary onClick={onAdvance} Icon={SkipForward}>
               Skip

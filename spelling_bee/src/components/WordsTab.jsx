@@ -225,6 +225,29 @@ export default function WordsTab({
         )}
       </section>
 
+      {/* freedictionaryapi.com's terms require visible credit and a link back
+          to Wiktionary in return for a free, keyless feed — this is that,
+          kept to the one place in the app that already reads as a footer. */}
+      <p className="text-center text-[12px] text-dim">
+        Definitions from{" "}
+        <a
+          href="https://en.wiktionary.org"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-sage"
+        >
+          Wiktionary
+        </a>
+        , via{" "}
+        <a
+          href="https://freedictionaryapi.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-sage"
+        >
+          FreeDictionaryAPI.com
+        </a>
+      </p>
       <p className="pb-2 text-center text-[12px] text-dim">Built by DarwinGMC · MSW</p>
     </div>
   );
