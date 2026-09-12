@@ -1,40 +1,12 @@
-const KEY_PROGRESS = "sb-progress";
-const KEY_WORDS = "sb-words";
-const KEY_AUTOMIC = "sb-automic";
-/** The word list as it is being edited, which is not the word list. Kept apart
-    so leaving the tab mid-edit doesn't drill a half-typed list — or lose it. */
-const KEY_DRAFT = "sb-words-draft";
-
-export const MASTERY_STREAK = 3;
-
-export function statusOf(word, progress) {
-  const entry = progress[word];
-  if (!entry) return "new";
-  if (entry.streak >= MASTERY_STREAK) return "mastered";
-  if (entry.lastWrong) return "hard";
-  return "learning";
-}
-
-export function poolFor(filter, words, progress) {
-  if (filter === "all") return [...words];
-  return words.filter((word) => statusOf(word, progress) === filter);
-}
-
-export function shuffle(list) {
-  const copy = [...list];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
+export const KEY_DRAFT = "sb.draft";
+export const KEY_PROGRESS = "sb.progress";
+export const KEY_WORDS = "sb.words";
+export const KEY_AUTOMIC = "sb.automic";
 
 export function loadStored(key, fallback) {
   try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed ?? fallback;
+    const raw = localStorage.getItem(key);
+    return raw === null ? fallback : JSON.parse(raw);
   } catch {
     return fallback;
   }
@@ -42,10 +14,40 @@ export function loadStored(key, fallback) {
 
 export function saveStored(key, value) {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* storage unavailable — run in-session only */
+    // storage full or blocked — ignore
   }
 }
 
-export { KEY_AUTOMIC, KEY_DRAFT, KEY_PROGRESS, KEY_WORDS };
+export const MASTERY_STREAK = 3;
+
+// Called by ProgressTab.jsx:29 and ProgressComb.jsx:104,118.
+// Must return one of the four keys of STATUS in ProgressComb.jsx.
+export function statusOf(word, progress) {
+    const record = progress[word]
+    if (!record) return "new";
+    if (record >= MASTERY_STREAK) return "mastered";
+    if (record === 0) return "hard";
+    return "learning";
+}
+
+// Which words are eligible to drill right now, given a filter.
+// FILTER_LABEL in PracticeTab.jsx:31 lists the five filter values.
+export function poolFor(filter, words, progress) {
+
+    if (filter === "all") return words
+    return words.filter((word) => (statusOf(word, progress)))
+
+}
+
+
+export function shuffle(list) {
+    const out = [...list]
+
+    for (let i = out.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1))
+
+        [out[i], out[j]] = [out[j], out[i]]
+    }
+}
