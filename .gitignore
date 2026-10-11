@@ -17,3 +17,10 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# Project notes and design prototypes, kept local
+/CLAUDE.md
+/STATE.md
+/DECISIONS.md
+/docs/
+/spelling_bee/prototypes/
