@@ -16,6 +16,15 @@ const ROW_RISE = 0.75 * CELL_H;
 
 /** Cells per cluster: 19, the hexagon three cells to a side. */
 export const CLUSTER_SIDE = 3;
+export const CLUSTER_SIZE = 19;
+
+/**
+ * Which cluster a word lives in. Clusters are consecutive runs of nineteen
+ * words in list order, so a cluster is a page of the speller's own list: the
+ * same nineteen words every time, and a practice set of a size that can be
+ * learned in a sitting.
+ */
+export const clusterOf = (index) => Math.floor(index / CLUSTER_SIZE);
 
 /**
  * A nineteen-cell hexagon tiles the plane, because 19 = 2² + 2·3 + 3². The
@@ -35,8 +44,10 @@ export const LATTICE = [
 
 /** Mortar between clusters, in cell widths. Cluster centres are √19 apart on
     the tiling lattice, so pushing them out by this fraction of that opens an
-    even seam everywhere without breaking the interlock. */
-const SEAM = 0.2;
+    even seam everywhere without breaking the interlock. Wide enough to see on
+    a phone: at a fifth of a cell the clusters merged into one field, and a
+    cluster you can't see is a set you can't find. */
+export const SEAM = 0.55;
 /** Length of a hex vector: |(q,r)|² = q² + qr + r². */
 const hexNorm = ([q, r]) => Math.sqrt(q * q + q * r + r * r);
 const SPREAD = 1 + SEAM / hexNorm(LATTICE[0]);
@@ -121,33 +132,70 @@ const CLUSTER_CELLS = hexRows(CLUSTER_SIDE).flatMap((length, row) =>
  * Returns positions in cell widths with the top-left of the comb at the
  * origin, so the caller only has to divide by `width` and `height`.
  */
+/** Cluster rows on the tilted lattice sit about 1.8 cells apart vertically,
+    and cell rows inside a cluster 0.87 apart; anything closer than the band to
+    the top of a row reads as part of it. */
+const CLUSTER_BAND = 1.9;
+const CELL_BAND = 0.4;
+
+/** Top to bottom in bands, left to right within a band: the order a page is read. */
+function readingOrder(items, y, x, band) {
+  const sorted = [...items].sort((a, b) => y(a) - y(b));
+  const bands = [];
+  for (const item of sorted) {
+    const last = bands[bands.length - 1];
+    if (last && y(item) - last.top < band) last.items.push(item);
+    else bands.push({ top: y(item), items: [item] });
+  }
+  return bands.flatMap((band) => band.items.sort((a, b) => x(a) - x(b)));
+}
+
 export function combLayout(count) {
-  const per = capacity(CLUSTER_SIDE);
+  const per = CLUSTER_SIZE;
   const clusterCount = Math.ceil(count / per);
   const gridSide = sideFor(clusterCount);
 
-  const cells = [];
-  orderedCells(gridSide)
+  // Which lattice positions hold a cluster: the compact centre-out set, so the
+  // comb stays one piece. Step across the tiling lattice, then push out by the
+  // seam; the clusters keep their interlock and simply stop touching.
+  const sites = orderedCells(gridSide)
     .slice(0, clusterCount)
-    .forEach((cluster, c) => {
-      // Step across the tiling lattice, then push out by the seam. The
-      // clusters keep their interlocking arrangement and simply stop touching.
+    .map((cluster) => {
       const [gq, gr] = axialOf(gridSide, cluster.row, cluster.col);
       const [cx, cy] = cartesian(
         (gq * LATTICE[0][0] + gr * LATTICE[1][0]) * SPREAD,
         (gq * LATTICE[0][1] + gr * LATTICE[1][1]) * SPREAD
       );
-
-      // A part-full cluster fills from the side facing the middle of the comb,
-      // not from its own centre. Filling from its own centre leaves a nearly
-      // empty cluster as a single cell stranded two cells clear of anything
-      // else, which is the island this layout exists to avoid. The full
-      // clusters take all nineteen either way, so only the last one notices.
-      CLUSTER_CELLS.map(([dx, dy]) => ({ x: cx + dx, y: cy + dy }))
-        .sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y))
-        .slice(0, count - c * per)
-        .forEach((cell, i) => cells.push({ index: c * per + i, ...cell }));
+      return { cx, cy };
     });
+
+  // Which cluster is which: reading order, so cluster 1 is at the top left
+  // and the list reads down the comb like pages. The last cluster is usually
+  // part-full, and wherever reading order puts it, it stays one of the sites
+  // chosen above, so it still touches the rest.
+  const ordered = readingOrder(sites, (s) => s.cy, (s) => s.cx, CLUSTER_BAND);
+  // The part-full cluster must sit on the comb's rim, not in the middle of it,
+  // or the spare cells would leave a hole: give it the outermost site.
+  if (count % per) {
+    const rim = sites[sites.length - 1];
+    ordered.splice(ordered.indexOf(rim), 1);
+    ordered.push(rim);
+  }
+
+  const cells = [];
+  ordered.forEach(({ cx, cy }, c) => {
+    const placed = CLUSTER_CELLS.map(([dx, dy]) => ({ x: cx + dx, y: cy + dy }));
+    // A part-full cluster uses the cells on the side facing the middle of the
+    // comb, not its own centre: filling from its own centre leaves a nearly
+    // empty cluster as a single cell stranded clear of anything else. Within
+    // a cluster, words run in reading order either way.
+    const chosen = placed
+      .sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y))
+      .slice(0, count - c * per);
+    readingOrder(chosen, (p) => p.y, (p) => p.x, CELL_BAND).forEach((cell, i) =>
+      cells.push({ index: c * per + i, cluster: c, ...cell })
+    );
+  });
 
   const left = Math.min(...cells.map((c) => c.x)) - 0.5;
   const top = Math.min(...cells.map((c) => c.y)) - CELL_H / 2;
@@ -157,6 +205,42 @@ export function combLayout(count) {
   return {
     width,
     height,
-    cells: cells.map((c) => ({ index: c.index, x: c.x - left, y: c.y - top })),
+    cells: cells.map((c) => ({ index: c.index, cluster: c.cluster, x: c.x - left, y: c.y - top })),
   };
+}
+
+const DIRECTIONS = {
+  left: [-1, 0],
+  right: [1, 0],
+  up: [0, -1],
+  down: [0, 1],
+};
+
+/**
+ * The cell an arrow key should move to: the nearest cell lying in that
+ * direction, preferring the one most squarely in line. A pointy-top comb has
+ * no cell straight above another, so up and down land on whichever neighbour
+ * above or below sits closest; null at the edge.
+ */
+export function neighbor(cells, fromIndex, direction) {
+  const from = cells.find((c) => c.index === fromIndex);
+  const [ux, uy] = DIRECTIONS[direction] ?? [0, 0];
+  if (!from) return null;
+  let best = null;
+  let bestScore = Infinity;
+  for (const cell of cells) {
+    if (cell.index === fromIndex) continue;
+    const dx = cell.x - from.x;
+    const dy = cell.y - from.y;
+    const dist = Math.hypot(dx, dy);
+    const along = (dx * ux + dy * uy) / dist;
+    // Within about 70 degrees of the arrow's direction.
+    if (along < 0.34) continue;
+    const score = dist * (2 - along);
+    if (score < bestScore) {
+      bestScore = score;
+      best = cell;
+    }
+  }
+  return best ? best.index : null;
 }

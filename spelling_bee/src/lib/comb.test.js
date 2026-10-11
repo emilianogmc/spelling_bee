@@ -4,6 +4,7 @@ import {
   CELL_H,
   CLUSTER_SIDE,
   LATTICE,
+  SEAM,
   capacity,
   combLayout,
   hexRows,
@@ -162,7 +163,7 @@ test("every cluster touches another, so the comb is one connected piece", () => 
 
     // Cells one apart are neighbours; across a seam they sit a seam further.
     // Anything beyond that means the two clusters are not adjacent at all.
-    const REACH = 1.35;
+    const REACH = 1.15 + SEAM;
     const ids = [...groups.keys()];
     const seen = new Set([ids[0]]);
     const queue = [ids[0]];
@@ -227,6 +228,86 @@ test("the bounding box holds every cell with exactly half a cell to spare", () =
         y >= CELL_H / 2 - 1e-9 && y <= height - CELL_H / 2 + 1e-9,
         `count ${count}: y ${y} of ${height}`
       );
+    }
+  }
+});
+
+test("a cluster is nineteen consecutive words, the same set the drill uses", async () => {
+  const { CLUSTER_SIZE, clusterOf } = await import("./comb.js");
+  const progress = await import("./progress.js");
+  assert.equal(CLUSTER_SIZE, capacity(CLUSTER_SIDE));
+  assert.equal(progress.CLUSTER_SIZE, CLUSTER_SIZE, "drill sets and comb clusters agree");
+  for (const count of COUNTS) {
+    const { cells } = combLayout(count);
+    for (const cell of cells) assert.equal(cell.cluster, clusterOf(cell.index), `count ${count} cell ${cell.index}`);
+  }
+  const words = Array.from({ length: 162 }, (_, i) => `w${i}`);
+  const { cells } = combLayout(162);
+  const inThird = cells.filter((c) => c.cluster === 2).map((c) => words[c.index]).sort();
+  assert.deepEqual(inThird, progress.poolFor("cluster:2", words, {}).sort());
+});
+
+test("arrow keys move to the nearest cell in that direction, and stop at the edge", async () => {
+  const { neighbor } = await import("./comb.js");
+  const { cells } = combLayout(162);
+  const at = (i) => cells.find((c) => c.index === i);
+  for (const from of [0, 5, 40, 100]) {
+    for (const dir of ["left", "right", "up", "down"]) {
+      const to = neighbor(cells, from, dir);
+      if (to === null) continue;
+      const dx = at(to).x - at(from).x;
+      const dy = at(to).y - at(from).y;
+      if (dir === "right") assert.ok(dx > 0.4, `${from} right`);
+      if (dir === "left") assert.ok(dx < -0.4, `${from} left`);
+      if (dir === "up") assert.ok(dy < -0.4, `${from} up`);
+      if (dir === "down") assert.ok(dy > 0.4, `${from} down`);
+      // An arrow never skips an adjacent cell lying that way: if a touching
+      // neighbour exists in the direction, that is where it lands. Only at a
+      // cluster's edge does it cross the seam to the next one.
+      const u = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }[dir];
+      const adjacent = cells.some((c) => {
+        const ex = c.x - at(from).x;
+        const ey = c.y - at(from).y;
+        const d = Math.hypot(ex, ey);
+        return c.index !== from && d < 1.05 && (ex * u[0] + ey * u[1]) / d >= 0.34;
+      });
+      if (adjacent) assert.ok(Math.hypot(dx, dy) < 1.05, `${from} ${dir} skipped an adjacent cell`);
+    }
+  }
+  // The leftmost cell has nowhere further left to go.
+  const leftmost = cells.reduce((a, b) => (b.x < a.x ? b : a));
+  assert.equal(neighbor(cells, leftmost.index, "left"), null);
+});
+
+test("words run in reading order inside a cluster, and clusters read down the comb", async () => {
+  const { CLUSTER_SIZE } = await import("./comb.js");
+  for (const count of COUNTS) {
+    const { cells } = combLayout(count);
+    const byCluster = new Map();
+    for (const cell of cells) {
+      if (!byCluster.has(cell.cluster)) byCluster.set(cell.cluster, []);
+      byCluster.get(cell.cluster).push(cell);
+    }
+    for (const [c, group] of byCluster) {
+      group.sort((a, b) => a.index - b.index);
+      for (let i = 1; i < group.length; i++) {
+        const a = group[i - 1];
+        const b = group[i];
+        const sameRow = Math.abs(a.y - b.y) < 0.1;
+        assert.ok(sameRow ? b.x > a.x : b.y > a.y, `count ${count} cluster ${c}: word ${b.index} reads before ${a.index}`);
+      }
+    }
+    // Cluster 1 sits in the top band of the comb; the full clusters never
+    // jump back up a band as their numbers rise.
+    const centre = (c) => {
+      const g = byCluster.get(c);
+      return { x: g.reduce((s, p) => s + p.x, 0) / g.length, y: g.reduce((s, p) => s + p.y, 0) / g.length };
+    };
+    const full = [...byCluster.keys()].filter((c) => byCluster.get(c).length === CLUSTER_SIZE).sort((a, b) => a - b);
+    const tops = full.map((c) => centre(c).y);
+    if (full.length > 1) assert.ok(tops[0] - Math.min(...tops) < 1.9, `count ${count}: cluster 1 is not in the top band`);
+    for (let i = 1; i < full.length; i++) {
+      assert.ok(tops[i] > tops[i - 1] - 1.9, `count ${count}: cluster ${full[i] + 1} sits above cluster ${full[i - 1] + 1}`);
     }
   }
 });
