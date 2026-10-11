@@ -2,18 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Matches --color-night, so phone browser chrome doesn't frame the drill
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Matches the ink page, so phone browser chrome doesn't frame the drill
          in white while the page underneath is dark. -->
-    <meta name="theme-color" content="#241e1e" />
+    <meta name="theme-color" content="#171312" />
     <meta name="color-scheme" content="dark" />
-    <title>Spelling drill — finals</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
+    <title>spelling.help</title>
+    <meta
+      name="description"
+      content="Spelling-bee practice by voice. It reads each word aloud, listens while you spell it back, and keeps track of the words you miss."
     />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <!-- The drill's one typeface, fetched before the first paint rather than
+         discovered in the stylesheet. -->
+    <link rel="preload" href="/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin />
+
+    <!-- Link previews. Scrapers need absolute URLs: change these with the
+         domain if the site moves. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="spelling.help" />
+    <meta property="og:title" content="spelling.help: spelling-bee practice by voice" />
+    <meta
+      property="og:description"
+      content="It reads each word aloud, listens while you spell it back, and keeps track of the words you miss."
+    />
+    <meta property="og:url" content="https://spellingdrills.pages.dev/" />
+    <meta property="og:image" content="https://spellingdrills.pages.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Hear it. Spell it out loud. spelling.help" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>
