@@ -1,0 +1,1905 @@
+/* Placard. The whole drill screen is a colour field that names the state:
+
+     ink        waiting on you, the mic open, checking
+     honey      the voice is speaking
+     olive      right
+     cream      not quite (the letters you missed carry the vermilion)
+     vermilion  the mic or recognition can't work
+
+   Archivo carries everything on the drill, its width axis condensing long
+   words; Newsreader sets the things that are read like a dictionary (hard
+   words, missed words). Text on every light field is the same near-black ink;
+   contrast is measured against each field below. */
+
+:root {
+  --pl-ink: #171312;
+  --pl-raised: #221d1b;
+  --pl-line: #3a3230;
+  --pl-cream: #fcf2e5;
+  --pl-sage: #b5ab9c;
+  --pl-honey: #e3a64b;
+  --pl-honey-pale: #f3ce8c;
+  --pl-ember: #ec5b38;
+  --pl-ember-pale: #f28a6e;
+  --pl-ember-deep: #c43b19; /* mistakes on cream: 4.8:1 */
+  --pl-olive: #9aae6b;
+  --pl-ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --pl-tabs-h: 62px;
+  /* Everything on the Progress screen that isn't comb, top to bottom, so the
+     comb can size itself to fit above the docked bar. */
+  --pl-comb-chrome: 420px;
+  --pl-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --pl-serif: "Newsreader", Georgia, serif;
+}
+
+.pl {
+  /* ink field: cream 16.8:1, sage 7.9:1, honey 9.1:1, emberpale 7.2:1 */
+  --pl-bg: var(--pl-ink);
+  --pl-fg: var(--pl-cream);
+  --pl-fg-2: var(--pl-sage);
+  --pl-band-bg: var(--pl-honey);
+  --pl-band-fg: var(--pl-ink);
+  --pl-band-hover: var(--pl-honey-pale);
+  --pl-mark: var(--pl-ember-pale);
+
+  min-height: 100dvh;
+  padding-bottom: calc(var(--pl-tabs-h) + env(safe-area-inset-bottom));
+  background: var(--pl-bg);
+  color: var(--pl-fg);
+  font-family: var(--pl-sans);
+  /* No crossfade between fields: text and ground fading in opposite
+     directions pass through the same mid-tone, and for that instant nothing
+     is readable. The field flips, like a placard. */
+}
+
+/* Light fields all carry ink text and an ink band. */
+.pl--honey,
+.pl--ember,
+.pl--olive,
+.pl--cream {
+  --pl-fg: var(--pl-ink);
+  --pl-fg-2: var(--pl-ink);
+  --pl-band-bg: var(--pl-ink);
+  --pl-band-fg: var(--pl-cream);
+  --pl-band-hover: #2e2826;
+}
+
+.pl--honey {
+  --pl-bg: var(--pl-honey); /* ink 9.1:1 */
+}
+
+.pl--olive {
+  /* Deeper than the old pale olive: that was only 1.4:1 from cream in
+     brightness, so right and not quite could merge for a colour-blind
+     speller. This is 2.2:1 from cream. Ink on it: 7.6:1. */
+  --pl-bg: var(--pl-olive);
+}
+
+.pl--cream {
+  --pl-bg: var(--pl-cream); /* ink 16.8:1 */
+  --pl-mark: var(--pl-ember-deep);
+}
+
+.pl--ember {
+  --pl-bg: var(--pl-ember); /* ink 5.4:1 */
+}
+
+.pl :focus-visible {
+  outline: 3px solid var(--pl-fg);
+  outline-offset: 3px;
+}
+
+button,
+a,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pl-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- the drill screen ---------- */
+
+.pl-screen {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: calc(100dvh - var(--pl-tabs-h) - env(safe-area-inset-bottom));
+}
+
+.pl-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: max(16px, env(safe-area-inset-top)) 18px 0;
+}
+
+.pl-placard {
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+  margin: 0;
+  line-height: 0.8;
+}
+
+.pl-placard-no {
+  padding-top: 3px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pl-placard-n {
+  font-size: 44px;
+  font-weight: 900;
+  font-stretch: 75%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.pl-wordmark {
+  margin: 0;
+  padding-top: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.pl-top-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.pl-pool {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pl-fg-2);
+}
+
+/* The word in play as its comb cell. On a coloured field the cell sits on a
+   small ink plate so its honey and vermilion still read. */
+.pl-wordcell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 5px;
+  background: var(--pl-ink);
+  color: var(--pl-cream);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pl-wordcell .pl-glyph {
+  width: 18px;
+  height: 20.8px;
+}
+
+.pl-main {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 12px 18px 16px;
+}
+
+.pl-label {
+  display: flex;
+  align-items: center;
+  gap: 0.28em;
+  margin: 0 0 14px;
+  font-size: clamp(30px, 10cqi, 64px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+}
+
+/* The voice is speaking: the word "Listen" is the screen. */
+.pl-stage--speaking .pl-label {
+  font-size: clamp(88px, 30cqi, 8.5rem);
+  font-weight: 900;
+  font-stretch: 80%;
+  letter-spacing: -0.02em;
+}
+
+/* Typing: the voice reading again keeps the label at its usual size, so the
+   box being typed into doesn't move. */
+.pl-screen--typed.pl-stage--speaking .pl-label {
+  font-size: clamp(30px, 10cqi, 64px);
+  font-weight: 800;
+  font-stretch: 100%;
+  letter-spacing: -0.01em;
+}
+
+/* A verdict is read from across the room, so the verdict word grows. */
+.pl-stage--correct .pl-label,
+.pl-stage--wrong .pl-label {
+  margin-bottom: 10px;
+  font-size: clamp(52px, 17cqi, 7rem);
+  font-weight: 900;
+  font-stretch: 85%;
+}
+
+.pl-stage--listening .pl-label,
+.pl-stage--retry .pl-label {
+  color: var(--pl-ember-pale);
+}
+
+.pl-dot {
+  width: 0.36em;
+  height: 0.36em;
+  border-radius: 50%;
+  background: var(--pl-ember);
+  animation: pl-pulse 1.3s var(--pl-ease) infinite;
+}
+
+.pl-word {
+  min-width: 0;
+}
+
+.pl-word--dim .pl-letters {
+  opacity: 0.6;
+}
+
+.pl-letters {
+  display: flex;
+  align-items: center;
+  gap: 0.07em;
+  min-height: 0.95em;
+  /* Room under and before the letters for the added-letter wedge, inside the
+     box that overflow clips to; the negative margin keeps the first letter
+     on the column's edge. */
+  margin-left: -0.12em;
+  padding-bottom: 0.16em;
+  padding-left: 0.12em;
+  overflow: hidden;
+  font-size: calc(min(8.5rem, 100cqi / (var(--n) * var(--adv))) * var(--fit, 1));
+  font-weight: 800;
+  font-stretch: var(--wdth);
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+/* What was misheard stays well below headword size: a wrong spelling at hero
+   size is one the speller might remember. */
+.pl-letters--small {
+  font-size: calc(min(3rem, 100cqi / (var(--n) * var(--adv))) * var(--fit, 1));
+}
+
+.pl-l {
+  position: relative;
+  display: inline-block;
+  animation: pl-in 160ms var(--pl-ease) both;
+}
+
+/* A letter you got wrong or left out: a vermilion block with the letter in
+   cream, never narrower than a wide letter, so an I can't read as a "!". */
+.pl-l--mark {
+  min-width: 0.62em;
+  padding: 0 0.04em;
+  background: var(--pl-mark);
+  color: var(--pl-bg);
+  text-align: center;
+}
+
+/* A letter you added: a vermilion wedge under the gap where it went. */
+.pl-l--ins::before {
+  content: "";
+  position: absolute;
+  left: -0.035em;
+  bottom: -0.15em;
+  transform: translateX(-50%);
+  border-left: 0.08em solid transparent;
+  border-right: 0.08em solid transparent;
+  border-bottom: 0.12em solid var(--pl-mark);
+}
+
+.pl-caret {
+  width: 0.09em;
+  height: 0.78em;
+  background: var(--pl-ember);
+  animation: pl-blink 1s steps(2, jump-none) infinite;
+}
+
+.pl-body {
+  max-width: 36ch;
+  margin: 16px 0 0;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.pl-body--strong {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.pl-body--big {
+  max-width: 20ch;
+  font-size: clamp(28px, 8cqi, 48px);
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.pl-speaking .pl-body {
+  margin-top: 0;
+}
+
+.pl-hint {
+  max-width: 40ch;
+  margin: 10px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pl-fg-2);
+}
+
+/* The browser never reports how far through the word the voice is, so this
+   only says that it is reading. */
+.pl-progress {
+  position: relative;
+  display: block;
+  height: 14px;
+  margin-top: 26px;
+  overflow: hidden;
+  background: rgba(23, 19, 18, 0.16);
+}
+
+.pl-progress::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: var(--pl-fg);
+  animation: pl-travel 1.1s ease-in-out infinite alternate;
+}
+
+.pl-typed {
+  width: 100%;
+  margin-top: 4px;
+  padding: 0 0 6px;
+  border: 0;
+  border-bottom: 6px solid var(--pl-fg);
+  background: transparent;
+  color: var(--pl-fg);
+  font: 800 clamp(40px, 12cqi, 6.5rem) / 1.05 var(--pl-sans);
+  font-stretch: 84%;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  caret-color: var(--pl-honey);
+}
+
+.pl-speaking .pl-typed {
+  margin-top: 28px;
+}
+
+.pl-typed::placeholder {
+  color: var(--pl-fg);
+  opacity: 0.55;
+}
+
+.pl-typed:focus-visible {
+  outline: none;
+  border-bottom-color: var(--pl-honey);
+}
+
+.pl--honey .pl-typed:focus-visible {
+  border-bottom-color: var(--pl-ink);
+}
+
+/* ---------- a miss: what you said, over what the word is ---------- */
+
+.pl-compare {
+  margin: 22px 0 0;
+}
+
+.pl-compare-grid {
+  display: grid;
+  grid-template-columns: auto repeat(var(--cols), minmax(0, 2.6rem));
+  gap: 4px 3px;
+  align-items: center;
+  justify-content: start;
+}
+
+.pl-compare-label {
+  padding-right: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pl-cell {
+  display: grid;
+  place-items: center;
+  height: 2.4rem;
+  border-bottom: 2px solid rgba(23, 19, 18, 0.22);
+  font-size: clamp(14px, 4.2vw, 24px);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pl-cell--you.pl-cell--sub,
+.pl-cell--you.pl-cell--extra {
+  outline: 2px solid var(--pl-ember-deep);
+  outline-offset: -2px;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 1.5px),
+    var(--pl-ember-deep) calc(50% - 1.5px),
+    var(--pl-ember-deep) calc(50% + 1.5px),
+    transparent calc(50% + 1.5px)
+  );
+}
+
+.pl-cell--you.pl-cell--missing {
+  color: var(--pl-ember-deep);
+}
+
+.pl-cell--word.pl-cell--sub,
+.pl-cell--word.pl-cell--missing {
+  border-bottom-color: var(--pl-ember-deep);
+  background: var(--pl-ember-deep);
+  color: var(--pl-cream); /* 4.8:1 */
+}
+
+.pl-cell--word.pl-cell--extra {
+  color: rgba(23, 19, 18, 0.45);
+}
+
+/* ---------- start, end of pass, errors ---------- */
+
+.pl-mega {
+  margin: 0;
+  font-size: clamp(130px, 46cqi, 18rem);
+  font-weight: 900;
+  font-stretch: 75%;
+  line-height: 0.78;
+  color: var(--pl-honey);
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-introtitle {
+  max-width: 15ch;
+  margin: 10px 0 28px;
+  font-size: clamp(30px, 9cqi, 60px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.pl-counts {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  justify-content: start;
+  gap: 4px 22px;
+  margin: 0;
+}
+
+.pl-intro-note {
+  max-width: 46ch;
+  margin-top: 22px;
+}
+
+.pl-done .pl-introtitle {
+  margin-bottom: 0;
+}
+
+.pl-count {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 4px;
+}
+
+.pl-counts dt {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pl-fg-2);
+}
+
+.pl-counts dd {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 900;
+  font-stretch: 80%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.pl-count--hard dd {
+  color: var(--pl-ember-pale);
+}
+
+.pl-done .pl-body {
+  margin-top: 0;
+}
+
+.pl-list {
+  list-style: none;
+  max-width: 640px;
+  margin: 20px 0 0;
+  padding: 0;
+}
+
+.pl-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 7px 0 6px;
+  border-top: 2px solid var(--pl-fg);
+}
+
+.pl-list-word {
+  font-family: var(--pl-serif);
+  font-size: 26px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.pl-list-note {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pl-fg-2);
+}
+
+.pl-error-big {
+  margin: 0 0 12px;
+  font-size: clamp(64px, 20cqi, 8rem);
+  font-weight: 900;
+  font-stretch: 80%;
+  line-height: 0.9;
+}
+
+/* ---------- the foot: secondary actions, Again, and the band ---------- */
+
+/* Docked above the tab bar: on a short phone screen (an SE in Safari, with
+   its toolbars) the screen can run taller than the viewport, and the primary
+   action must never be the part that scrolls out of reach. */
+.pl-foot {
+  position: sticky;
+  bottom: calc(var(--pl-tabs-h) + env(safe-area-inset-bottom));
+  z-index: 5;
+  padding: 0;
+  background: var(--pl-bg);
+}
+
+.pl-note {
+  margin: 0 18px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pl-mark);
+}
+
+.pl--honey .pl-note,
+.pl--olive .pl-note {
+  color: var(--pl-ink);
+}
+
+.pl-secondary {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2px;
+  margin: 0 0 6px;
+  padding: 0 10px;
+}
+
+.pl-secondary button,
+.pl-textbtn {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--pl-fg);
+  font: 700 15px var(--pl-sans);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .pl-secondary button:hover,
+  .pl-textbtn:hover {
+    text-decoration-thickness: 4px;
+  }
+}
+
+.pl-bar {
+  display: flex;
+  gap: 2px;
+}
+
+.pl-again {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 80px;
+  min-height: 80px;
+  border: 0;
+  background: var(--pl-band-bg);
+  color: var(--pl-band-fg);
+  font: 700 12px var(--pl-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .pl-again:hover {
+    background: var(--pl-band-hover);
+  }
+}
+
+/* Listening stays quiet: the bar is the one strong block, so Again steps
+   back to an outline beside it. */
+.pl-stage--listening .pl-again,
+.pl-stage--arming .pl-again {
+  background: var(--pl-ink);
+  color: var(--pl-honey);
+  box-shadow: inset 0 0 0 2px #4a403d;
+}
+
+/* While the voice is reading, Again shows it is busy with the word. */
+.pl-again.is-busy {
+  box-shadow: inset 0 -6px 0 var(--pl-honey);
+}
+
+.pl--honey .pl-again.is-busy {
+  box-shadow: inset 0 -6px 0 var(--pl-honey-pale);
+}
+
+.pl-band {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  min-height: 80px;
+  padding: 0 22px;
+  border: 0;
+  background: var(--pl-band-bg);
+  color: var(--pl-band-fg);
+  font: 800 24px var(--pl-sans);
+  font-stretch: 90%;
+  text-align: left;
+  cursor: pointer;
+  /* No colour transition: the bar changes with the field, in the same frame.
+     A fade passed through muddy in-between colours at every change. */
+  transition: transform 90ms var(--pl-ease);
+}
+
+@media (hover: hover) {
+  .pl-band:hover:not(:disabled) {
+    background: var(--pl-band-hover);
+  }
+}
+
+.pl-band:active:not(:disabled),
+.pl-again:active {
+  transform: translateY(2px);
+}
+
+/* Disabled reads as an outline of the bar rather than a dimmed fill. */
+.pl-band:disabled {
+  cursor: default;
+  background: transparent;
+  color: var(--pl-fg);
+  font-weight: 500;
+  box-shadow: inset 0 3px 0 var(--pl-fg);
+}
+
+.pl-band:disabled .pl-band-mark {
+  visibility: hidden;
+}
+
+/* The mic is open: the one strong vermilion while listening. Ink on it 5.4:1. */
+.pl-band.is-live {
+  background: var(--pl-ember);
+  color: var(--pl-ink);
+}
+
+@media (hover: hover) {
+  .pl-band.is-live:hover {
+    background: #f0745a;
+  }
+}
+
+.pl-band:focus-visible,
+.pl-again:focus-visible {
+  outline: 3px solid var(--pl-band-fg);
+  outline-offset: -8px;
+}
+
+.pl-band.is-live:focus-visible {
+  outline-color: var(--pl-ink);
+}
+
+.pl-band-mark {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.pl-band.is-live .pl-band-mark {
+  font-size: 20px;
+}
+
+/* ---------- tab bar ---------- */
+
+.pl-tabs {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 20;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--pl-line);
+  background: var(--pl-ink);
+}
+
+.pl-tabs ul {
+  list-style: none;
+  display: flex;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.pl-tabs li {
+  flex: 1;
+}
+
+.pl-tabs button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: var(--pl-tabs-h);
+  border: 0;
+  background: none;
+  color: var(--pl-sage);
+  font: 700 12px var(--pl-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .pl-tabs button:hover {
+    color: var(--pl-cream);
+  }
+}
+
+.pl-tabs button.is-current {
+  color: var(--pl-honey);
+}
+
+.pl-tabs button.is-current::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 28%;
+  right: 28%;
+  height: 4px;
+  background: var(--pl-honey);
+}
+
+.pl-tabs button:focus-visible {
+  outline: 3px solid var(--pl-cream);
+  outline-offset: -6px;
+}
+
+/* ---------- Progress and Words ---------- */
+
+.pl-page {
+  max-width: 760px;
+  padding: max(24px, env(safe-area-inset-top)) 18px 40px;
+}
+
+.pl-page section {
+  margin-top: 40px;
+}
+
+.pl-page-title {
+  margin: 0;
+  font-size: clamp(56px, 18vw, 6rem);
+  font-weight: 900;
+  font-stretch: 80%;
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+}
+
+.pl-section-title {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 3px solid var(--pl-cream);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.pl-section-note {
+  margin: 4px 0 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--pl-sage);
+}
+
+.pl-prose {
+  max-width: 62ch;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.pl-hardlist {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.pl-hardlist button {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pl-cream);
+  font: italic 500 24px/1.3 var(--pl-serif);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(252, 242, 229, 0.35);
+  text-underline-offset: 5px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .pl-hardlist button:hover {
+    text-decoration-color: var(--pl-ember-pale);
+    text-decoration-thickness: 2px;
+  }
+}
+
+.pl-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: min(46vh, 420px);
+  padding: 14px;
+  border: 2px solid #4a403d;
+  background: var(--pl-raised);
+  color: var(--pl-cream);
+  font: 500 17px/1.55 var(--pl-sans);
+  resize: vertical;
+}
+
+.pl-textarea:focus-visible {
+  outline: none;
+  border-color: var(--pl-honey);
+}
+
+.pl-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  margin-top: 12px;
+  border: 3px solid var(--pl-honey);
+  background: var(--pl-honey);
+  color: var(--pl-ink);
+  font: 800 20px var(--pl-sans);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .pl-action:hover:not(:disabled) {
+    border-color: var(--pl-honey-pale);
+    background: var(--pl-honey-pale);
+  }
+}
+
+.pl-action:disabled {
+  cursor: default;
+  border-color: var(--pl-line);
+  background: transparent;
+  color: var(--pl-sage);
+}
+
+.pl-action--quiet {
+  border-color: #6b5f5b;
+  background: transparent;
+  color: var(--pl-cream);
+  font-weight: 700;
+}
+
+@media (hover: hover) {
+  .pl-action--quiet:hover:not(:disabled) {
+    border-color: var(--pl-cream);
+    background: transparent;
+  }
+}
+
+.pl-action--danger {
+  border-color: var(--pl-ember);
+  background: transparent;
+  color: var(--pl-ember-pale);
+}
+
+@media (hover: hover) {
+  .pl-action--danger:hover:not(:disabled) {
+    border-color: var(--pl-ember);
+    background: #3a1d16;
+  }
+}
+
+.pl-confirm {
+  display: flex;
+  gap: 10px;
+}
+
+.pl-setting {
+  display: block;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--pl-line);
+}
+
+.pl-setting-label {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pl-setting-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--pl-sage);
+}
+
+.pl-range {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pl-sage);
+}
+
+.pl-range input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  accent-color: var(--pl-honey);
+}
+
+.pl-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  cursor: pointer;
+}
+
+.pl-check input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  accent-color: var(--pl-honey);
+}
+
+.pl-check.is-off {
+  cursor: default;
+}
+
+.pl-check.is-off .pl-setting-label {
+  color: var(--pl-sage);
+}
+
+.pl-credits {
+  margin-top: 48px;
+  font-size: 14px;
+  color: var(--pl-sage);
+}
+
+.pl-credits p {
+  margin: 4px 0;
+}
+
+.pl-credits a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .pl-credits a:hover {
+    color: var(--pl-cream);
+  }
+}
+
+.pl-debug {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
+  padding: 24px 18px;
+}
+
+/* ---------- Progress: the comb ---------- */
+
+.pl-page--progress {
+  max-width: none;
+  padding-bottom: 0;
+}
+
+.pl-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+
+.pl-progress-summary {
+  margin: 10px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--pl-sage);
+}
+
+.pl-progress-summary strong {
+  font-size: 1.5em;
+  font-weight: 900;
+  font-stretch: 80%;
+  color: var(--pl-cream);
+}
+
+.pl-progress-summary .pl-hardnum {
+  color: var(--pl-ember-pale);
+}
+
+.pl-progress-grid {
+  display: grid;
+  grid-template-areas: "key" "comb" "inspect" "find";
+  gap: 22px;
+  max-width: 1200px;
+  margin-top: 22px;
+}
+
+.pl-area-key {
+  grid-area: key;
+}
+
+.pl-area-comb {
+  grid-area: comb;
+}
+
+.pl-area-inspect {
+  grid-area: inspect;
+  /* Clear of the docked bar and the tabs when scrolled into view. */
+  scroll-margin-bottom: calc(var(--pl-tabs-h) + 100px + env(safe-area-inset-bottom));
+  scroll-margin-top: 16px;
+}
+
+.pl-area-find {
+  grid-area: find;
+}
+
+.pl-comb-caption {
+  max-width: 52ch;
+  margin: 14px auto 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--pl-sage);
+  text-align: center;
+}
+
+.pl-page--progress > section,
+.pl-every {
+  max-width: 760px;
+}
+
+.pl-comb {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.pl-cellbtn {
+  position: absolute;
+  padding: 1.5px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform 180ms var(--pl-ease), opacity 180ms var(--pl-ease);
+}
+
+/* Outside the lit set or the search: still there, just quiet. */
+.pl-cellbtn.is-faded {
+  opacity: 0.2;
+}
+
+/* The picked cell lifts out of the field. The word in play and the picked
+   word both carry the cream ring; size is what tells them apart. */
+.pl-cellbtn.is-picked {
+  z-index: 2;
+  transform: scale(1.45);
+}
+
+.pl-cellbtn:focus-visible {
+  outline: none;
+}
+
+.pl-ring,
+.pl-gap,
+.pl-hex,
+.pl-hex-in {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* Rings, outside in: cream ring, ink gap, the cell's own edge. The gap keeps
+   a cream ring readable against a honey or pale-honey cell. */
+.pl-ring.is-on {
+  padding: 2px;
+  background: var(--pl-cream);
+}
+
+.pl-ring.is-on > .pl-gap {
+  padding: 1.5px;
+  background: var(--pl-ink);
+}
+
+/* Keyboard focus: the same rings, heavier, so it outranks the word in play. */
+.pl-cellbtn:focus-visible .pl-ring {
+  padding: 3px;
+  background: var(--pl-cream);
+}
+
+.pl-cellbtn:focus-visible .pl-gap {
+  padding: 2px;
+  background: var(--pl-ink);
+}
+
+/* The picked word's cluster: a faint ring on each of its cells. */
+.pl-cellbtn.in-cluster:not(.is-picked) .pl-ring:not(.is-on) {
+  padding: 1px;
+  background: rgba(252, 242, 229, 0.55);
+}
+
+.pl-hex {
+  padding: 1.5px;
+  background: var(--edge);
+}
+
+/* Honey rises from the bottom of the cell to the real streak. */
+.pl-hex-in {
+  background: linear-gradient(
+    to top,
+    var(--fillc) calc(var(--fill) * 100%),
+    var(--pl-ink) calc(var(--fill) * 100%)
+  );
+}
+
+.pl-hex--new {
+  --edge: #8c807b; /* 4.9:1 on ink, a perceivable edge */
+  --fillc: var(--pl-ink);
+}
+
+.pl-hex--learning {
+  --edge: var(--pl-honey);
+  --fillc: var(--pl-honey);
+}
+
+.pl-hex--mastered {
+  --edge: var(--pl-honey-pale);
+  --fillc: var(--pl-honey-pale);
+}
+
+.pl-hex--hard {
+  --edge: var(--pl-ember);
+}
+
+/* Hard: full and holed, so it differs from mastered in shape, not only hue. */
+.pl-hex--hard .pl-hex-in {
+  background: radial-gradient(circle at 50% 50%, var(--pl-ink) 0 24%, var(--pl-ember) 25%);
+}
+
+.pl-glyph {
+  flex: none;
+  display: inline-block;
+  width: 22px;
+  height: 25.4px;
+}
+
+/* The whole list as one cell, its background drawn from the real counts. */
+.pl-glyph--all {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.pl-find {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.pl-find-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pl-sage);
+}
+
+.pl-find input {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 2px solid #4a403d;
+  background: var(--pl-raised);
+  color: var(--pl-cream);
+  font: 600 18px var(--pl-sans);
+}
+
+.pl-find input:focus-visible {
+  outline: none;
+  border-color: var(--pl-honey);
+}
+
+.pl-find-note {
+  max-width: 420px;
+  margin: 8px auto 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pl-sage);
+}
+
+/* On a phone the key is one strip of five, right above the comb: glyph and
+   count on top, the name under them. */
+.pl-area-key .pl-section-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.pl-sets {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.pl-set {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "glyph count" "label label";
+  align-items: center;
+  gap: 2px 6px;
+  width: 100%;
+  min-height: 64px;
+  padding: 6px 2px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--pl-line);
+  background: none;
+  color: var(--pl-cream);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pl-set .pl-glyph {
+  grid-area: glyph;
+  width: 18px;
+  height: 20.8px;
+}
+
+.pl-set-count {
+  grid-area: count;
+}
+
+.pl-set-label {
+  grid-area: label;
+}
+
+@media (hover: hover) {
+  .pl-set:hover .pl-set-label {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
+  }
+}
+
+.pl-set-count {
+  /* Narrow enough that "162" stays inside its fifth of a phone. */
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 900;
+  font-stretch: 78%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.pl-set--hard .pl-set-count {
+  color: var(--pl-ember-pale);
+}
+
+.pl-set-label {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pl-set-play {
+  display: none;
+}
+
+/* Lit: a honey bar under the set, its count in honey. */
+.pl-set.is-on {
+  box-shadow: inset 0 -5px 0 var(--pl-honey);
+}
+
+.pl-set.is-on .pl-set-count {
+  color: var(--pl-honey);
+}
+
+.pl-inspect {
+  /* The picked word sits on its own status, Placard-style. Ink on honey
+     9.1:1, on pale honey 12.5:1, on vermilion 5.4:1. */
+  --ib: var(--pl-raised);
+  --ifg: var(--pl-cream);
+  padding: 18px 18px 10px;
+  background: var(--ib);
+  color: var(--ifg);
+}
+
+.pl-inspect--learning {
+  --ib: var(--pl-honey);
+  --ifg: var(--pl-ink);
+}
+
+.pl-inspect--mastered {
+  --ib: var(--pl-honey-pale);
+  --ifg: var(--pl-ink);
+}
+
+.pl-inspect--hard {
+  --ib: var(--pl-ember);
+  --ifg: var(--pl-ink);
+}
+
+.pl-inspect-where {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pl-inspect-word {
+  container-type: inline-size;
+  margin: 0;
+}
+
+.pl-inspect .pl-letters {
+  font-size: calc(min(4.5rem, 100cqi / (var(--n) * var(--adv))) * var(--fit, 1));
+}
+
+.pl-inspect-status {
+  margin: 14px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.pl-inspect-facts {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.pl-inspect-miss {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.pl-inspect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  margin: 10px -8px 0;
+}
+
+.pl-inspect .pl-textbtn {
+  color: var(--ifg);
+}
+
+.pl-inspect .pl-textbtn:focus-visible {
+  outline-color: var(--ifg);
+}
+
+.pl-textbtn--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pl-inspect-empty {
+  margin: 0;
+  padding: 18px 0;
+  border-top: 3px solid var(--pl-line);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--pl-sage);
+}
+
+.pl-every {
+  margin-top: 40px;
+  padding-top: 8px;
+  border-top: 3px solid var(--pl-cream);
+}
+
+.pl-every summary {
+  min-height: 44px;
+  padding-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pl-every table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.pl-every th,
+.pl-every td {
+  overflow-wrap: anywhere;
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--pl-line);
+  text-align: left;
+}
+
+.pl-every thead th {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pl-sage);
+}
+
+.pl-every--hard td:nth-child(2) {
+  color: var(--pl-ember-pale);
+}
+
+.pl-every--learning td:nth-child(2) {
+  color: var(--pl-honey);
+}
+
+.pl-every--mastered td:nth-child(2) {
+  color: var(--pl-honey-pale);
+}
+
+/* The page's one primary action, docked above the tabs like the drill's. */
+.pl-page-bar {
+  position: sticky;
+  bottom: calc(var(--pl-tabs-h) + env(safe-area-inset-bottom));
+  z-index: 5;
+  display: flex;
+  margin: 36px -18px 0;
+}
+
+.pl-band-note {
+  font-weight: 600;
+}
+
+/* Docked over a scrolling page, an empty set's bar stays solid so the page
+   doesn't show through it. */
+.pl-page-bar .pl-band:disabled {
+  background: var(--pl-ink);
+}
+
+/* ---------- desktop ---------- */
+
+@media (min-width: 960px) {
+  .pl-top {
+    padding: 28px 40px 0;
+  }
+
+  .pl-placard-n {
+    font-size: min(60px, 7vh);
+  }
+
+  .pl-main {
+    padding: 16px 40px 28px;
+  }
+
+  /* A laptop screen is wide but short: 720 or 768 pixels tall, less the
+     browser. The big type is capped by the height as well as the width, so
+     every drill screen still fits above the bar. */
+  .pl-stage--speaking .pl-label {
+    font-size: clamp(88px, 30cqi, min(8.5rem, 20vh));
+  }
+
+  .pl-stage--correct .pl-label,
+  .pl-stage--wrong .pl-label {
+    font-size: clamp(52px, 17cqi, min(7rem, 11vh));
+  }
+
+  .pl-letters {
+    font-size: calc(min(8.5rem, 16vh, 100cqi / (var(--n) * var(--adv))) * var(--fit, 1));
+  }
+
+  .pl-mega {
+    font-size: clamp(110px, 46cqi, min(18rem, 28vh));
+  }
+
+  .pl-introtitle {
+    font-size: clamp(30px, 9cqi, min(60px, 6.5vh));
+  }
+
+  .pl-error-big {
+    font-size: clamp(64px, 20cqi, min(8rem, 15vh));
+  }
+
+  .pl-body {
+    font-size: 22px;
+  }
+
+  .pl-secondary {
+    padding: 0 32px;
+  }
+
+  .pl-band {
+    min-height: min(92px, 11vh);
+    padding: 0 40px;
+    font-size: 32px;
+  }
+
+  .pl-again {
+    width: 110px;
+    min-height: min(92px, 11vh);
+  }
+
+  .pl-compare-grid {
+    grid-template-columns: auto repeat(var(--cols), minmax(0, 3.4rem));
+  }
+
+  .pl-cell {
+    height: min(3.2rem, 5vh);
+    font-size: min(30px, 3.6vh);
+  }
+
+  .pl-page {
+    padding: 48px 40px 64px;
+  }
+
+  .pl-page--progress {
+    padding-bottom: 0;
+  }
+
+  .pl-page--progress {
+    --pl-comb-chrome: 400px;
+  }
+
+  .pl-progress-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+    grid-template-areas: "comb key" "comb inspect" "find inspect";
+    grid-template-rows: auto auto 1fr;
+    align-items: start;
+    gap: 24px 48px;
+  }
+
+  /* On a wide screen the key is a list beside the comb. */
+  .pl-area-key .pl-section-title {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  .pl-sets {
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+    margin-top: 12px;
+  }
+
+  .pl-sets li:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .pl-set {
+    grid-template-columns: auto auto 1fr;
+    grid-template-areas: "glyph count label";
+    gap: 12px;
+    min-height: 58px;
+  }
+
+  .pl-set .pl-glyph {
+    width: 22px;
+    height: 25.4px;
+  }
+
+  .pl-set-count {
+    font-size: 34px;
+  }
+
+  .pl-set-label {
+    font-size: 17px;
+  }
+
+  .pl-set-play {
+    display: inline;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--pl-sage);
+  }
+
+  .pl-page-bar {
+    margin: 48px -40px 0;
+  }
+}
+
+/* ---------- short screens ----------
+   A small phone with the browser's toolbars showing leaves under 620px. The
+   type steps down so the whole drill still fits above the bar. */
+
+@media (max-height: 620px) {
+  .pl-top {
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+
+  .pl-placard-n {
+    font-size: 36px;
+  }
+
+  .pl-main {
+    padding-top: 6px;
+    padding-bottom: 10px;
+  }
+
+  .pl-mega {
+    font-size: clamp(96px, 34cqi, 11rem);
+  }
+
+  .pl-introtitle {
+    margin: 6px 0 14px;
+    font-size: clamp(26px, 8cqi, 40px);
+  }
+
+  .pl-counts dd {
+    font-size: 30px;
+  }
+
+  .pl-intro-note {
+    margin-top: 12px;
+  }
+
+  .pl-stage--speaking .pl-label {
+    font-size: clamp(72px, 26cqi, 7rem);
+  }
+
+  .pl-stage--correct .pl-label,
+  .pl-stage--wrong .pl-label {
+    font-size: clamp(44px, 14cqi, 5.5rem);
+  }
+
+  .pl-letters {
+    font-size: calc(min(6rem, 100cqi / (var(--n) * var(--adv))) * var(--fit, 1));
+  }
+
+  .pl-compare {
+    margin-top: 12px;
+  }
+
+  .pl-cell {
+    height: 2rem;
+  }
+
+  .pl-body {
+    margin-top: 10px;
+    font-size: 17px;
+  }
+
+  .pl-body--strong {
+    font-size: 19px;
+  }
+
+  .pl-band {
+    min-height: 64px;
+    font-size: 21px;
+  }
+
+  .pl-again {
+    width: 68px;
+    min-height: 64px;
+  }
+}
+
+/* ---------- big screens ----------
+   A placard is sized to the wall, not to a phone. On a large, tall screen the
+   drill's type grows with the height, so a 16:9 screen is filled the way a
+   phone is, rather than showing the phone layout in one corner. */
+
+@media (min-width: 1200px) and (min-height: 900px) {
+  .pl-top {
+    padding: 36px 56px 0;
+  }
+
+  .pl-placard-n {
+    font-size: max(60px, 7vh);
+  }
+
+  .pl-placard-no,
+  .pl-pool,
+  .pl-wordmark {
+    font-size: 17px;
+  }
+
+  .pl-main {
+    padding: 16px 56px 28px;
+  }
+
+  .pl-label {
+    font-size: clamp(30px, 10cqi, max(64px, 7vh));
+  }
+
+  .pl-stage--speaking .pl-label {
+    font-size: clamp(88px, 30cqi, max(8.5rem, 20vh));
+  }
+
+  .pl-screen--typed.pl-stage--speaking .pl-label {
+    font-size: clamp(30px, 10cqi, max(64px, 7vh));
+  }
+
+  .pl-stage--correct .pl-label,
+  .pl-stage--wrong .pl-label {
+    font-size: clamp(52px, 17cqi, max(7rem, 12vh));
+  }
+
+  .pl-letters {
+    font-size: calc(min(max(8.5rem, 17vh), 100cqi / (var(--n) * var(--adv))) * var(--fit, 1));
+  }
+
+  .pl-mega {
+    font-size: clamp(130px, 46cqi, max(18rem, 30vh));
+  }
+
+  .pl-introtitle {
+    font-size: clamp(30px, 9cqi, max(60px, 6vh));
+  }
+
+  .pl-counts dd {
+    font-size: max(40px, 4.4vh);
+  }
+
+  .pl-counts dt,
+  .pl-hint {
+    font-size: 17px;
+  }
+
+  .pl-error-big {
+    font-size: clamp(64px, 20cqi, max(8rem, 16vh));
+  }
+
+  .pl-body {
+    font-size: max(22px, 2.4vh);
+  }
+
+  .pl-body--strong {
+    font-size: max(24px, 2.7vh);
+  }
+
+  .pl-typed {
+    font-size: clamp(40px, 12cqi, max(6.5rem, 13vh));
+  }
+
+  .pl-compare-grid {
+    grid-template-columns: auto repeat(var(--cols), minmax(0, max(3.4rem, 6vh)));
+  }
+
+  .pl-cell {
+    height: max(3.2rem, 5.2vh);
+    font-size: max(30px, 3.4vh);
+  }
+
+  .pl-compare-label {
+    font-size: 15px;
+  }
+
+  .pl-secondary {
+    padding: 0 48px;
+  }
+
+  .pl-secondary button {
+    font-size: 17px;
+  }
+
+  .pl-band {
+    min-height: max(92px, 9.5vh);
+    padding: 0 56px;
+    font-size: max(32px, 3.4vh);
+  }
+
+  .pl-again {
+    width: max(110px, 11vh);
+    min-height: max(92px, 9.5vh);
+    font-size: 14px;
+  }
+}
+
+@keyframes pl-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.12em);
+  }
+}
+
+@keyframes pl-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes pl-pulse {
+  50% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+}
+
+@keyframes pl-travel {
+  from {
+    transform: translateX(-10%);
+  }
+  to {
+    transform: translateX(245%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still reading, just not moving: the whole bar holds. */
+  .pl-progress::after {
+    width: 100%;
+  }
+
+  .pl,
+  .pl *,
+  .pl *::before,
+  .pl *::after {
+    animation: none !important;
+    transition-duration: 1ms !important;
+  }
+}

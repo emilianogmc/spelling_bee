@@ -7,31 +7,24 @@ export const TABS = [
 ];
 
 /**
- * Fixed to the bottom because every control used during a drill has to sit in
- * thumb reach on a phone held in one hand.
+ * Fixed to the bottom, under the drill's own bar, and always ink: the field
+ * above it changes colour with every state, and the frame around it doesn't.
  */
 export default function TabBar({ active, onChange }) {
   return (
-    <nav
-      aria-label="Sections"
-      style={{ zIndex: "var(--z-nav)" }}
-      className="fixed inset-x-0 bottom-0 border-t border-line bg-surface/95 backdrop-blur-sm"
-    >
-      <ul className="mx-auto flex max-w-[560px]">
+    <nav aria-label="Sections" className="pl-tabs">
+      <ul>
         {TABS.map(({ id, label, Icon }) => {
           const current = id === active;
           return (
-            <li key={id} className="flex-1">
+            <li key={id}>
               <button
                 type="button"
                 onClick={() => onChange(id)}
                 aria-current={current ? "page" : undefined}
-                className={`flex min-h-[56px] w-full flex-col items-center justify-center gap-1 pt-2 text-[11px] font-medium transition-colors ${
-                  current ? "text-honey" : "text-sage hover:text-cream"
-                }`}
-                style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }}
+                className={current ? "is-current" : undefined}
               >
-                <Icon size={21} strokeWidth={current ? 2.4 : 1.9} aria-hidden="true" />
+                <Icon size={20} strokeWidth={current ? 2.5 : 2} aria-hidden="true" />
                 {label}
               </button>
             </li>

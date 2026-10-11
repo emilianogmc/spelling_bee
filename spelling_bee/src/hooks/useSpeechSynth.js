@@ -27,6 +27,9 @@ const REPEAT_GUARD_MS = 400;
 const WATCHDOG_MS = 400;
 const MAX_RETRIES = 2;
 
+const NOVELTY_VOICE =
+  /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Deranged|Hysterical|Pipe Organ)\b/i;
+
 export function useSpeechSynth() {
   const voiceRef = useRef(null);
   // Chromium can collect an utterance that nothing else references before it
@@ -36,6 +39,7 @@ export function useSpeechSynth() {
   const timerRef = useRef(null);
   const watchdogRef = useRef(null);
   const lastSpeakAtRef = useRef(0);
+  const lastTextRef = useRef("");
 
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState(null);
@@ -65,14 +69,23 @@ export function useSpeechSynth() {
     if (!supported) return undefined;
 
     const pickVoice = () => {
-      const voices = window.speechSynthesis.getVoices() || [];
+      const all = window.speechSynthesis.getVoices() || [];
+      // Apple's novelty voices are local en-US voices too, and WebKit marks
+      // every voice as default, so list order alone could pick "Bad News" or
+      // "Zarvox" to read the word. They're left out, and a voice the system
+      // ships in enhanced or premium quality, or Samantha, goes first.
+      const voices = all.filter((v) => !NOVELTY_VOICE.test(v.name));
+      const local = voices.filter((v) => v.lang === "en-US" && v.localService);
       // A local voice is preferred over a network-backed one ("Google US
       // English"), which goes silent when its backend is unreachable.
       voiceRef.current =
+        local.find((v) => /\((enhanced|premium)\)/i.test(v.name)) ||
+        local.find((v) => /^samantha\b/i.test(v.name)) ||
         voices.find((v) => v.lang === "en-US" && v.localService) ||
         voices.find((v) => v.lang === "en-US") ||
         voices.find((v) => v.lang?.startsWith("en")) ||
         voices[0] ||
+        all[0] ||
         null;
     };
 
@@ -103,7 +116,7 @@ export function useSpeechSynth() {
       // No synthesiser at all still has to release the caller, or a drill that
       // opens the mic from onEnd never opens it once.
       if (!supported) {
-        onEnd?.();
+        onEnd?.({ spoken: false, error: "unsupported" });
         return;
       }
       const synth = window.speechSynthesis;
@@ -118,24 +131,31 @@ export function useSpeechSynth() {
       // rather than allowed to cancel what's in flight. Without this, rapid
       // re-clicks cancel each other in a chain and nothing is ever audible:
       // every attempt dies before its own onstart can fire.
+      // Only a repeat of the same text is held off. A different text is a new
+      // request: holding off a new word left the old one's onEnd to open the
+      // mic for a word nobody had heard (two quick Skips did it).
       const now = Date.now();
       const sinceLast = now - lastSpeakAtRef.current;
-      if (sinceLast < REPEAT_GUARD_MS && (synth.speaking || synth.pending)) {
+      const sameText = lastTextRef.current === `${spellOut}:${text}`;
+      if (sameText && sinceLast < REPEAT_GUARD_MS && (synth.speaking || synth.pending)) {
         note(`held off repeat "${text}" (${sinceLast}ms since last)`);
         return;
       }
       lastSpeakAtRef.current = now;
+      lastTextRef.current = `${spellOut}:${text}`;
 
       const token = (tokenRef.current += 1);
       const isCurrent = () => tokenRef.current === token;
       // The caller re-opens the mic from onEnd, so every way this can finish —
       // spoken, errored, or a wedged engine we gave up on — has to reach it,
       // exactly once. Missing it leaves the mic shut for the rest of the drill.
+      // It says whether anything was actually heard, so the caller can decide
+      // not to open the mic for a word the speller never got to hear.
       let handedOff = false;
-      const handOff = () => {
+      const handOff = (result) => {
         if (handedOff) return;
         handedOff = true;
-        onEnd?.();
+        onEnd?.(result);
       };
       clearTimer();
       clearWatchdog();
@@ -172,7 +192,7 @@ export function useSpeechSynth() {
           setSpeaking(false);
           utteranceRef.current = null;
           note("end");
-          handOff();
+          handOff({ spoken: true });
         };
         utterance.onerror = (event) => {
           if (!isLive()) return;
@@ -182,7 +202,7 @@ export function useSpeechSynth() {
           const reason = event?.error || "unknown";
           setError(reason);
           note(`error ${reason}`);
-          handOff();
+          handOff({ spoken: false, error: reason });
         };
         return utterance;
       };
@@ -221,7 +241,7 @@ export function useSpeechSynth() {
             note("gave up after retries");
             setError("stuck-no-start");
             setSpeaking(false);
-            handOff();
+            handOff({ spoken: false, error: "stuck-no-start" });
           }
         }, WATCHDOG_MS);
       };

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
-import { KEY_DRAFT, loadStored, saveStored } from "../lib/progress.js";
+import { KEY_DRAFT, loadStored, saveStored, splitWords } from "../lib/progress.js";
 
 /**
  * What is actually going to be saved, and what it costs.
@@ -11,7 +11,7 @@ import { KEY_DRAFT, loadStored, saveStored } from "../lib/progress.js";
  * are folded here, first spelling wins, and the count says so before saving.
  */
 function readDraft(draft, words) {
-  const lines = draft.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines = splitWords(draft);
 
   const seen = new Set();
   const parsed = [];
@@ -82,27 +82,31 @@ export default function WordsTab({
   const { parsed, dirty } = state;
 
   return (
-    <div className="flex flex-col gap-8">
+    <main className="pl-page">
+      <h1 className="pl-page-title">Words</h1>
+
       {/* The list is what the tab is named after, so it opens the tab. Voice
           settings are set once and left alone; they used to sit on top of it. */}
-      <section>
-        <h2 className="mb-1 font-display text-xl font-semibold">Word list</h2>
-        <p className="mb-4 text-[14px] text-sage">One word per line.</p>
+      <section aria-labelledby="list-title">
+        <h2 id="list-title" className="pl-section-title">
+          Word list
+        </h2>
+        <p className="pl-section-note">One word per line, or separated by commas.</p>
 
         <textarea
           value={draft}
           spellCheck="false"
           onChange={(event) => setDraft(event.target.value)}
-          aria-label="Word list, one word per line"
+          aria-labelledby="list-title"
           aria-describedby="list-summary"
           autoCapitalize="off"
           autoCorrect="off"
-          /* 16px, not the 13 it was: Safari zooms the page on any field under
-             16 and this one is read as much as it is typed into. */
-          className="min-h-[min(46vh,420px)] w-full resize-y rounded-xl border border-dim bg-surface p-3.5 font-mono text-base leading-relaxed text-cream outline-none focus:border-honey"
+          /* 16px or more: Safari zooms the page on any field under 16, and
+             this one is read as much as it is typed into. */
+          className="pl-textarea"
         />
 
-        <p id="list-summary" aria-live="polite" className="mt-2 text-[14px] text-sage">
+        <p id="list-summary" aria-live="polite" className="pl-section-note">
           {summarise(state)}
         </p>
 
@@ -110,41 +114,34 @@ export default function WordsTab({
           type="button"
           onClick={() => onSave(parsed)}
           disabled={!dirty || parsed.length === 0}
-          /* Ink on honey is 6.6:1 at any size; the label stays large because
-             this section has one obvious action, not to prop up contrast.
-             Nothing to save is a resting state rather than a broken button, so
-             it goes neutral instead of dimming the fill into an unreadable
-             slab. */
-          className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border-2 border-honey bg-honey text-[19px] font-bold text-ink transition-colors hover:border-honeypale hover:bg-honeypale disabled:cursor-default disabled:border-dim disabled:bg-transparent disabled:text-sage"
+          /* Nothing to save is a resting state rather than a broken button, so
+             it turns into an outline instead of dimming the fill into mud. */
+          className="pl-action"
         >
-          <Save size={19} aria-hidden="true" /> {dirty ? "Save word list" : "Saved"}
+          <Save size={20} aria-hidden="true" /> {dirty ? "Save word list" : "Saved"}
         </button>
 
         {/* A draft that survives the tab has to be escapable, or a bad paste
             follows the speller around. */}
         {dirty && (
-          <button
-            type="button"
-            onClick={() => setDraft(words.join("\n"))}
-            className="mx-auto mt-1 flex min-h-[44px] items-center px-3 text-[14px] text-sage transition-colors hover:text-cream"
-          >
+          <button type="button" onClick={() => setDraft(words.join("\n"))} className="pl-textbtn">
             Discard changes
           </button>
         )}
       </section>
 
-      <section>
-        <h2 className="mb-1 font-display text-xl font-semibold">Voice</h2>
-        <p className="mb-4 text-[14px] text-sage">
-          How the word is read, and when the mic opens.
-        </p>
+      <section aria-labelledby="voice-title">
+        <h2 id="voice-title" className="pl-section-title">
+          Voice
+        </h2>
+        <p className="pl-section-note">How the word is read, and when the mic opens.</p>
 
-        <div className="rounded-xl border border-line bg-surface px-4 py-4">
-          <label htmlFor="rate" className="block text-[15px] font-medium text-cream">
+        <div className="pl-setting">
+          <label htmlFor="rate" className="pl-setting-label">
             Reading speed
           </label>
-          <div className="mt-3 flex items-center gap-3">
-            <span className="text-[13px] text-sage">Slow</span>
+          <div className="pl-range">
+            <span>Slow</span>
             <input
               id="rate"
               type="range"
@@ -153,102 +150,94 @@ export default function WordsTab({
               step="0.05"
               value={rate}
               onChange={(event) => onRateChange(Number(event.target.value))}
-              className="h-11 min-w-0 flex-1"
             />
-            <span className="text-[13px] text-sage">Normal</span>
+            <span>Normal</span>
           </div>
         </div>
 
-        <label
-          className={`mt-2.5 flex min-h-[60px] items-center gap-3.5 rounded-xl border border-line bg-surface px-4 py-3 ${
-            micSupported && autoMicCapable ? "cursor-pointer" : "opacity-45"
-          }`}
-        >
+        <label className={`pl-setting pl-check ${micSupported && autoMicCapable ? "" : "is-off"}`}>
           <input
             type="checkbox"
             checked={autoMic}
             disabled={!micSupported || !autoMicCapable}
             onChange={onToggleAutoMic}
-            className="h-5 w-5 shrink-0 accent-honey"
           />
           <span>
-            <span className="block text-[15px] font-medium text-cream">
-              Open the mic automatically
-            </span>
-            <span className="block text-[13px] text-sage">
-              {micSupported && !autoMicCapable
-                ? "Unavailable on iPhone and iPad. Safari only opens the mic from a direct tap."
-                : "Starts listening as soon as the word finishes."}
+            <span className="pl-setting-label">Open the mic automatically</span>
+            <span className="pl-setting-note">
+              {!micSupported
+                ? "This browser has no speech recognition, so spellings are typed."
+                : !autoMicCapable
+                  ? "Unavailable on iPhone and iPad. Safari only opens the mic from a direct tap."
+                  : "Starts listening as soon as the word finishes."}
             </span>
           </span>
         </label>
       </section>
 
-      <section>
-        <h2 className="mb-1 font-display text-xl font-semibold">Reset</h2>
-        <p className="mb-4 text-[14px] text-sage">
-          Clears every streak and mastery mark. The word list itself is kept.
-        </p>
+      <section aria-labelledby="reset-title">
+        <h2 id="reset-title" className="pl-section-title">
+          Reset
+        </h2>
+        <p className="pl-section-note">Clears every streak and mastery mark. The word list itself is kept.</p>
 
         {confirmingReset ? (
-          <div className="flex gap-2.5">
+          <div className="pl-confirm">
             <button
               type="button"
               onClick={() => {
                 onReset();
                 setConfirmingReset(false);
               }}
-              /* Outlined, not filled: a destructive action should not look
-                 like the button you press to get on with the drill. The label
-                 is emberpale because ember itself is 4.1:1 on the page, which
-                 carries large text but not fifteen pixels of it. */
-              className="min-h-[52px] flex-1 rounded-xl border-2 border-ember text-[15px] font-semibold text-emberpale transition-colors hover:bg-emberdim"
+              /* Vermilion, and an outline: a destructive action should not look
+                 like the button you press to get on with the drill. */
+              className="pl-action pl-action--danger"
             >
               Erase all progress
             </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingReset(false)}
-              className="min-h-[52px] flex-1 rounded-xl border border-dim bg-surface text-[15px] text-cream transition-colors hover:border-cream"
-            >
+            <button type="button" onClick={() => setConfirmingReset(false)} className="pl-action pl-action--quiet">
               Keep it
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingReset(true)}
-            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dim bg-surface text-[15px] text-cream transition-colors hover:border-cream"
-          >
-            <RotateCcw size={17} aria-hidden="true" /> Reset progress
+          <button type="button" onClick={() => setConfirmingReset(true)} className="pl-action pl-action--quiet">
+            <RotateCcw size={18} aria-hidden="true" /> Reset progress
           </button>
         )}
+      </section>
+
+      {/* What leaves the device, said plainly, because the app can't keep
+          that promise on its own: speech recognition belongs to the browser. */}
+      <section aria-labelledby="privacy-title">
+        <h2 id="privacy-title" className="pl-section-title">
+          Privacy
+        </h2>
+        <p className="pl-section-note pl-prose">
+          Your word list and progress are saved in this browser only and never uploaded. There are no accounts.
+        </p>
+        <p className="pl-section-note pl-prose">
+          Turning your voice into letters is done by your browser. Chrome sends the audio to Google to do it, Edge
+          to Microsoft, and Safari uses Apple's speech recognition. Typing sends nothing. A definition is looked up
+          at FreeDictionaryAPI.com, which sees the word you asked about.
+        </p>
       </section>
 
       {/* freedictionaryapi.com's terms require visible credit and a link back
           to Wiktionary in return for a free, keyless feed — this is that,
           kept to the one place in the app that already reads as a footer. */}
-      <p className="text-center text-[12px] text-dim">
-        Definitions from{" "}
-        <a
-          href="https://en.wiktionary.org"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:text-sage"
-        >
-          Wiktionary
-        </a>
-        , via{" "}
-        <a
-          href="https://freedictionaryapi.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:text-sage"
-        >
-          FreeDictionaryAPI.com
-        </a>
-      </p>
-      <p className="pb-2 text-center text-[12px] text-dim">Built by DarwinGMC · MSW</p>
-    </div>
+      <footer className="pl-credits">
+        <p>
+          Definitions from{" "}
+          <a href="https://en.wiktionary.org" target="_blank" rel="noopener noreferrer">
+            Wiktionary
+          </a>
+          , via{" "}
+          <a href="https://freedictionaryapi.com" target="_blank" rel="noopener noreferrer">
+            FreeDictionaryAPI.com
+          </a>
+        </p>
+        <p>Built by DarwinGMC · MSW</p>
+      </footer>
+    </main>
   );
 }

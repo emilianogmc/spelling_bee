@@ -1,73 +1,55 @@
 @import "tailwindcss";
+@import "./fonts.css";
+/* The dev-only design prototypes carry their own CSS; keep words in them from
+   generating utilities here. Delete this line along with prototypes/. */
+@source not "../prototypes";
+@import "./placard.css";
 
 @theme {
-  /* Ratios below are measured against the ground each token is actually used
-     on, not against black, because most of this UI sits on tinted grounds.
+  /* Tokens still used through Tailwind utilities by the comb and the debug
+     panels. Everything else is styled in placard.css. Ratios are measured
+     against the ink page (#171312) these now sit on.
 
-     Three accents, one meaning each, and they never trade jobs:
-       honey  identity, progress, selection, the primary action
-       ember  live state, trouble, errors — rare on purpose
-       olive  a correct answer, and nothing else */
+     Three accents, one meaning each:
+       honey      identity, progress, selection, the primary action, the voice
+       vermilion  the mic being open, trouble, a mistake, a word that keeps failing
+       olive      a correct answer, and nothing else */
+  --color-ink: #171312;
+  --color-surface: #221d1b;
+  --color-raised: #2e2826;
+  --color-line: #3a3230; /* decorative dividers only */
+  --color-hover: #5d524f; /* an untouched comb cell */
+  --color-dim: #8c807b; /* 4.9:1 */
+  --color-sage: #b5ab9c; /* 7.9:1, secondary text */
+  --color-soft: #d8cfc0;
+  --color-cream: #fcf2e5; /* 16.8:1 */
 
-  /* Neutral ramp, page to text */
-  --color-ink: #2e2a29; /* the page */
-  --color-surface: #383331; /* panels */
-  --color-raised: #423c3a; /* controls lifted off a panel */
-  --color-line: #524646; /* 1.6:1 — decorative dividers only */
-  --color-hover: #665a57; /* 2.1:1 — inactive fills, an untouched cell */
-  --color-dim: #8c807b; /* 3.7:1 — the lightest that carries a real border */
-  --color-sage: #a8a492; /* 5.7:1 on the page, 5.0:1 on a panel — secondary text */
-  --color-soft: #d8cfc0; /* 9.2:1 — emphasis short of full brightness */
-  --color-cream: #fcf2e5; /* 12.8:1 — primary text, and the ground a miss sits on */
-
-  /* Honey: 6.6:1 as text, and 6.6:1 the other way as a fill under ink text,
-     which is why the primary button is honey rather than ember. */
   --color-honey: #e3a64b;
-  --color-honeypale: #f3ce8c; /* 9.5:1 — hover on a honey fill, a mastered cell */
-  --color-honeydeep: #b57f2e; /* 4.1:1 — large text and edges only */
+  --color-honeypale: #f3ce8c;
+  --color-honeydeep: #b57f2e;
 
-  /* Ember reads 4.1:1 on the page, so it carries large text, fills and marks,
-     never a sentence. Anything small and vermilion uses emberpale at 5.8:1. */
   --color-ember: #ec5b38;
-  --color-emberpale: #f28a6e;
+  --color-emberpale: #f28a6e; /* 7.2:1, vermilion as small text */
   --color-emberdim: #4a2a22;
 
-  --color-olive: #c4d69a; /* 9.1:1 — a correct verdict, under ink text */
+  --color-olive: #9aae6b;
   --color-olivemid: #9aae6b;
   --color-olivedim: #3a4230;
 
-  --font-display: "Fraunces", ui-serif, serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-
-  --z-nav: 20;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Newsreader", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 body {
+  margin: 0;
   background: var(--color-ink);
   color: var(--color-cream);
   font-family: var(--font-sans);
-  /* The drill is used one-handed on a phone; the tab bar owns the bottom. */
-  padding-bottom: env(safe-area-inset-bottom);
   -webkit-font-smoothing: antialiased;
-}
-
-/* Spelled-out letters are read character by character, so they get room to
-   breathe rather than the tight tracking display type would normally take. */
-.letters {
-  font-family: var(--font-mono);
-  letter-spacing: 0.18em;
-}
-
-/* Cream, not an accent: honey is the primary button's own fill, so a honey
-   ring would vanish on the control most worth focusing. Cream is the one
-   colour in the palette that never collides with what it surrounds. */
-:where(button, a, input, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-cream);
-  outline-offset: 2px;
-  border-radius: 4px;
 }
 
 ::selection {
@@ -77,56 +59,4 @@ body {
 
 .hex {
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-}
-
-input[type="range"] {
-  accent-color: var(--color-honey);
-}
-
-/* A verdict replacing the letters on the stage. Short, because the speller is
-   mid-drill and waiting on it. */
-@keyframes stage-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.stage-in {
-  animation: stage-in 200ms var(--ease-out-quart) both;
-}
-
-/* The mic is open. A pulsing dot says so without the whole button breathing,
-   which made the primary target look disabled on every other frame. */
-@keyframes live-dot {
-  50% {
-    opacity: 0.35;
-    transform: scale(0.82);
-  }
-}
-
-.live-dot {
-  animation: live-dot 1.4s var(--ease-out-quart) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* State still has to be visible; it just stops moving. The dot holds at full
-     opacity rather than vanishing, and the verdict appears without travel. */
-  .live-dot {
-    animation: none;
-  }
-
-  .stage-in {
-    animation-name: none;
-  }
-
-  *,
-  *::before,
-  *::after {
-    transition-duration: 1ms !important;
-  }
 }

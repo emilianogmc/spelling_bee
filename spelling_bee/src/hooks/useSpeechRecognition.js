@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { pickTranscript, splitOnRestart, transcriptToLetters } from "../lib/letters.js";
+import { isOnTrack, isSpokenWord, pickTranscript, splitOnRestart, transcriptToLetters } from "../lib/letters.js";
 
 /**
  * Continuous letter-by-letter recognition.
@@ -28,12 +28,38 @@ const SETTLE_MS = 1500;
 // slightly wrong the recogniser just kept respawning forever. So silence ends
 // the turn too — generously, since spellers pause to think mid-word.
 const IDLE_MS = 3000;
-// One letter short of the target and matching so far: the trailing letter is
-// probably still in flight, so it gets noticeably longer to land.
-const NEARLY_DONE_IDLE_MS = 4000;
+// Still the word's own opening letters, so either the speller is mid-word or
+// the recogniser has stalled: Chrome's real engine was seen holding results
+// back for several seconds on a slow connection, and the old three seconds
+// then judged half a spelling. Short of the word but on track waits longer.
+const ON_TRACK_IDLE_MS = 6000;
 
-export function useSpeechRecognition({ target, onResult, onRestart }) {
-  const [supported, setSupported] = useState(false);
+// A recogniser that ends almost as soon as it starts, hearing nothing, is
+// failing rather than bridging a silence. This many in a row stops the mic.
+const QUICK_END_MS = 1000;
+const MAX_QUICK_ENDS = 5;
+
+// What each fatal recognition error is called. "no-speech" and "aborted" are
+// not here: those end an instance, and onend bridges the gap with a new one.
+const ERRORS = {
+  "not-allowed": "Microphone blocked — allow access in your browser.",
+  "service-not-allowed": "Speech recognition is switched off.",
+  network: "Recognition needs an internet connection.",
+  "audio-capture": "No microphone was found.",
+};
+
+/**
+ * `respawn` is off where a recogniser may only be started inside a tap (iOS
+ * Safari). There, an instance the engine ends itself can't be replaced from
+ * onend: the new start() is refused as "not-allowed", which showed as "Mic
+ * blocked." and lost the letters. Instead the turn ends with what was heard.
+ */
+export function useSpeechRecognition({ target, onResult, onRestart, respawn = true }) {
+  // Known from the first render, so a browser that has recognition never
+  // paints a frame of "type the spelling here" first.
+  const [supported, setSupported] = useState(
+    () => typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
+  );
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
   const [interim, setInterim] = useState(false);
@@ -57,6 +83,10 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
   const deliverOnEndRef = useRef(false);
   const settleTimerRef = useRef(null);
   const idleTimerRef = useRef(null);
+  // The word itself was said, not spelled. Heard alone, it ends the turn as
+  // "heard the word, not its letters" rather than waiting on letters forever.
+  const wordSaidRef = useRef(false);
+  const quickEndsRef = useRef(0);
 
   // A new word earns a fresh start-over.
   useEffect(() => {
@@ -104,13 +134,29 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
   // Hands the buffer over exactly once, whichever comes first: the recogniser
   // ending, or the settle timeout.
+  const hand = useCallback(() => {
+    onResultRef.current?.(bufferRef.current, { wordOnly: !bufferRef.current && wordSaidRef.current });
+  }, []);
+
   const deliverBuffer = useCallback(() => {
     if (!deliverOnEndRef.current) return;
     deliverOnEndRef.current = false;
     clearSettleTimer();
     flushPending();
-    onResultRef.current?.(bufferRef.current);
-  }, [clearSettleTimer, flushPending]);
+    hand();
+  }, [clearSettleTimer, flushPending, hand]);
+
+  // Throws a session away: detached first, so none of its late events count,
+  // then aborted, so it stops listening without finishing its audio.
+  const discard = useCallback(() => {
+    const old = recogRef.current;
+    recogRef.current = null;
+    try {
+      old?.abort();
+    } catch {
+      /* already stopped */
+    }
+  }, []);
 
   // True only when a live recogniser was actually asked to stop — and so an
   // onend is genuinely coming.
@@ -141,7 +187,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
         flushPending();
         halt();
         setListening(false);
-        if (deliver) onResultRef.current?.(bufferRef.current);
+        if (deliver) hand();
         return;
       }
 
@@ -155,23 +201,23 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       clearSettleTimer();
       settleTimerRef.current = setTimeout(deliverBuffer, SETTLE_MS);
     },
-    [clearIdleTimer, clearSettleTimer, deliverBuffer, flushPending, halt]
+    [clearIdleTimer, clearSettleTimer, deliverBuffer, flushPending, halt, hand]
   );
 
   /**
    * Restarts the "they've stopped spelling" countdown. Called on every result
    * and on every respawn, so it only actually fires once letters stop arriving.
-   * Nothing heard yet means the speller hasn't begun — that waits indefinitely.
+   * Nothing heard yet means the speller hasn't begun — that waits indefinitely,
+   * unless they said the word and then nothing.
    */
   const armIdle = useCallback(
     (goal, soFar) => {
       clearIdleTimer();
-      if (!soFar) return;
-      const oneAway =
-        goal && goal.length - soFar.length === 1 && goal.startsWith(soFar);
+      if (!wantsMicRef.current) return;
+      if (!soFar && !wordSaidRef.current) return;
       idleTimerRef.current = setTimeout(
         () => finish(true, { immediate: true }),
-        oneAway ? NEARLY_DONE_IDLE_MS : IDLE_MS
+        goal && isOnTrack(soFar, goal) ? ON_TRACK_IDLE_MS : IDLE_MS
       );
     },
     [clearIdleTimer, finish]
@@ -189,7 +235,15 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     recog.interimResults = true;
     recog.maxAlternatives = 6;
 
+    // An instance that was replaced still fires its last events, and its onend
+    // used to spawn a second recogniser beside the live one (seen with
+    // Chrome's real engine after a retry). Only the current instance counts.
+    const live = () => recogRef.current === recog;
+    const spawnedAt = Date.now();
+    let heardAnything = false;
+
     recog.onstart = () => {
+      if (!live()) return;
       setListening(true);
       setError(null);
       note("start");
@@ -199,6 +253,11 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     recog.onaudioend = () => note("audioend");
 
     recog.onresult = (event) => {
+      if (!live()) return;
+      // A session that was judged or discarded can still be finishing its
+      // audio. Only a stop that owes a result still reads it.
+      if (!wantsMicRef.current && !deliverOnEndRef.current) return;
+      heardAnything = true;
       const goal = (targetRef.current || "").toLowerCase();
       let pending = "";
 
@@ -213,6 +272,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
+        if (isSpokenWord(result[0].transcript, goal)) wordSaidRef.current = true;
 
         // "May I start over?" — throw away the tangled attempt and read the word
         // again. Only the first request per word is honoured; later ones are
@@ -224,6 +284,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
             setRestartUsed(true);
             bufferRef.current = "";
             pending = "";
+            wordSaidRef.current = false;
             onRestartRef.current?.();
           }
           const tail = transcriptToLetters(rest, goal);
@@ -240,7 +301,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
         // against the target and read literally both.
         const alts = [];
         for (let j = 0; j < result.length; j++) alts.push(result[j].transcript);
-        const best = pickTranscript(alts, goal, bufferRef.current, pending);
+        const best = pickTranscript(alts, goal, bufferRef.current, pending, { interim: !result.isFinal });
 
         if (result.isFinal) bufferRef.current += best;
         else pending += best;
@@ -265,18 +326,22 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
       armIdle(goal, soFar);
     };
 
+    // Anything but a silence or an abort stops the mic and says why. Only a
+    // blocked mic used to stop it: offline or with no microphone, each error's
+    // onend respawned a recogniser that failed again, about thirty times a
+    // second, while the Offline screen flickered on and off.
     recog.onerror = (event) => {
+      if (!live()) return;
       note(`error ${event.error}`);
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        wantsMicRef.current = false;
-        setListening(false);
-        setError("Microphone blocked — allow access in your browser.");
-      } else if (event.error === "network") {
-        setError("Recognition needs an internet connection.");
-      }
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      wantsMicRef.current = false;
+      clearIdleTimer();
+      setListening(false);
+      setError(ERRORS[event.error] ?? "The microphone stopped working.");
     };
 
     recog.onend = () => {
+      if (!live()) return;
       note(`end (pending="${pendingRef.current}" buffer="${bufferRef.current}")`);
       // A recogniser throws away its interim results when it ends, so a
       // silence gap mid-word would otherwise wipe every letter spoken since
@@ -294,7 +359,28 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
         if (goal && bufferRef.current === goal) {
           wantsMicRef.current = false;
           setListening(false);
-          onResultRef.current?.(bufferRef.current);
+          hand();
+          return;
+        }
+
+        quickEndsRef.current =
+          !heardAnything && Date.now() - spawnedAt < QUICK_END_MS ? quickEndsRef.current + 1 : 0;
+        if (quickEndsRef.current >= MAX_QUICK_ENDS) {
+          wantsMicRef.current = false;
+          clearIdleTimer();
+          setListening(false);
+          setError("The microphone keeps stopping.");
+          return;
+        }
+
+        if (!respawn) {
+          if (bufferRef.current || wordSaidRef.current) {
+            finish(true, { immediate: true });
+            return;
+          }
+          wantsMicRef.current = false;
+          clearIdleTimer();
+          setListening(false);
           return;
         }
 
@@ -324,7 +410,7 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
 
     recogRef.current = recog;
     return recog;
-  }, [armIdle, deliverBuffer, finish, flushPending, note]);
+  }, [armIdle, clearIdleTimer, deliverBuffer, finish, flushPending, hand, note, respawn]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -352,7 +438,9 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
   // prompts for permission on its own, and a secure origin remembers it.
   const start = useCallback(() => {
     if (!supported) return;
-    // A new session cancels any delivery the previous one still owed.
+    // A new session cancels any delivery the previous one still owed, and
+    // never runs beside the previous recogniser.
+    discard();
     deliverOnEndRef.current = false;
     clearSettleTimer();
     clearIdleTimer();
@@ -362,6 +450,8 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     setInterim(false);
     setError(null);
     wantsMicRef.current = true;
+    wordSaidRef.current = false;
+    quickEndsRef.current = 0;
 
     const recog = spawn();
     if (!recog) return;
@@ -370,18 +460,27 @@ export function useSpeechRecognition({ target, onResult, onRestart }) {
     } catch {
       /* already running */
     }
-  }, [clearIdleTimer, clearSettleTimer, spawn, supported]);
+  }, [clearIdleTimer, clearSettleTimer, discard, spawn, supported]);
 
   const stop = useCallback(() => finish(true), [finish]);
 
+  // Everything about the current attempt goes: the session, any result it
+  // still owed after "Stop and check", and its letters. Otherwise a Skip,
+  // Again or tab change while checking had the old word's trailing letters
+  // judged against the next word.
   const reset = useCallback(() => {
     clearIdleTimer();
-    if (wantsMicRef.current) finish(false);
+    clearSettleTimer();
+    wantsMicRef.current = false;
+    deliverOnEndRef.current = false;
+    discard();
+    setListening(false);
     bufferRef.current = "";
     pendingRef.current = "";
+    wordSaidRef.current = false;
     setHeard("");
     setInterim(false);
-  }, [clearIdleTimer, finish]);
+  }, [clearIdleTimer, clearSettleTimer, discard]);
 
   return {
     supported,
